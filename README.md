@@ -2,6 +2,24 @@
 
 Light PartyKeys keyboards, including multiple boards joined together, from Synthesia on macOS or Windows using a virtual MIDI cable. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
 
+## Download and start
+
+[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-arm64.zip)
+[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip)
+
+**Download the ZIP, extract it, then double-click the “Start Synthesia bridge” launcher. No Python installation needed.**
+
+| Your computer | Direct download | Setup guide |
+| --- | --- | --- |
+| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
+
+Not sure which Mac download to choose? Open **Apple menu → About This Mac**: “Chip: Apple M…” means Apple Silicon; “Processor: Intel…” means Intel.
+
+[Release notes and all downloads](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/SHA256SUMS.txt)
+
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
 ## Requirements
@@ -17,15 +35,7 @@ Only **macOS has been tested with a physical keyboard so far**. Windows builds a
 
 This is an independent community project, not an official Synthesia or PartyKeys integration.
 
-## Download
-
-Get the executable for your computer from [GitHub Releases](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest). **No Python installation is needed.**
-
-| Computer | Download |
-| --- | --- |
-| Mac with Apple Silicon (M1 or newer), macOS 14+ | `partykeys-macos-arm64.zip` |
-| Mac with an Intel processor, macOS 15+ | `partykeys-macos-x64.zip` |
-| 64-bit Windows PC | `partykeys-windows-x64.zip` |
+## Opening your download
 
 Extract the ZIP before running it. Each download includes a command-line executable, a launcher, this guide, a demo MIDI file, and license notices. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
 
