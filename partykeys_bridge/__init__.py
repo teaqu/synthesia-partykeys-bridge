@@ -1,0 +1,1 @@
+"""PartyKeys MIDI lighting bridge."""

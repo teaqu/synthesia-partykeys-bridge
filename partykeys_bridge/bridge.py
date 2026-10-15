@@ -1,0 +1,74 @@
+"""Synthesia finger-based key-light messages, not ordinary performance MIDI."""
+LEFT_CHANNELS = {1, 2, 3, 4, 5, 11}  # Mido uses zero-based channels.
+RIGHT_CHANNELS = {0, 6, 7, 8, 9, 10, 12}
+
+
+class Bridge:
+    def __init__(self, left=(255, 255, 0), right=(255, 255, 0),
+                 left_channels=None, right_channels=None, pressed_color=(255, 0, 0)):
+        self.left, self.right = left, right
+        self.left_channels = LEFT_CHANNELS if left_channels is None else set(left_channels)
+        self.right_channels = RIGHT_CHANNELS if right_channels is None else set(right_channels)
+        if self.left_channels & self.right_channels:
+            raise ValueError("Left and right channels must not overlap")
+        self.active = {}
+        self.counts = {}
+        self.pressed = set()
+        self.pressed_color = pressed_color
+
+    def receive_pressed(self, message):
+        """Physical input is independent of Synthesia's requested lights."""
+        if message.type in ("reset", "stop"):
+            self.pressed.clear()
+        elif message.type == "control_change" and message.control in (120, 123):
+            self.pressed = {key for key in self.pressed if key[0] != message.channel}
+        elif message.type in ("note_on", "note_off"):
+            key = (message.channel, message.note)
+            if message.type == "note_on" and message.velocity:
+                self.pressed.add(key)
+            else:
+                self.pressed.discard(key)
+
+    def receive(self, message):
+        if message.type in ("reset", "stop"):
+            self.active.clear()
+            self.counts.clear()
+        elif message.type == "control_change":
+            if message.channel == 0 and message.control == 16:
+                self.active.clear()  # Synthesia play/hand-selection state change.
+                self.counts.clear()
+            elif message.control in (120, 123):
+                self.active = {k: v for k, v in self.active.items() if k[0] != message.channel}
+                self.counts = {k: v for k, v in self.counts.items() if k[0] != message.channel}
+        elif message.type in ("note_on", "note_off"):
+            if message.channel == 0 and (message.type == "note_off" or message.velocity == 0):
+                # Observed Synthesia finger-light stream: onset on the finger
+                # channel, release on channel 1 (Mido 0), for that pitch across
+                # all finger channels. A missed/unused cue must still go dark.
+                self.active = {k: v for k, v in self.active.items() if k[1] != message.note}
+                self.counts = {k: v for k, v in self.counts.items() if k[1] != message.note}
+                return
+            if message.channel not in self.left_channels | self.right_channels:
+                return
+            key = (message.channel, message.note)
+            if message.type == "note_on" and message.velocity:
+                # MIDI overlapping onsets require matching releases. RGB output
+                # still deduplicates identical illumination in the driver.
+                self.counts[key] = self.counts.get(key, 0) + 1
+                self.active[key] = self.left if message.channel in self.left_channels else self.right
+            else:
+                remaining = self.counts.get(key, 0) - 1
+                if remaining > 0:
+                    self.counts[key] = remaining
+                else:
+                    self.counts.pop(key, None)
+                    self.active.pop(key, None)
+
+    def lights(self):
+        # Component-wise blend when both hands request the same physical key.
+        lights = {}
+        for (_, note), rgb in self.active.items():
+            lights[note] = tuple(max(a, b) for a, b in zip(lights.get(note, (0, 0, 0)), rgb))
+        for _, note in self.pressed:
+            lights[note] = self.pressed_color
+        return lights
