@@ -38,6 +38,7 @@ jobs:
           New-Item -ItemType Directory -Force $bundle | Out-Null
           Copy-Item dist/partykeys.exe $bundle
           Copy-Item README.md $bundle
+          Copy-Item LICENSE $bundle
           Copy-Item 'packaging/Start Synthesia bridge.cmd' $bundle
           Copy-Item examples "$bundle/examples" -Recurse
           python scripts/bundle_notices.py $bundle
