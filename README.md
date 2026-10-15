@@ -9,7 +9,7 @@ Light PartyKeys keyboards, including multiple boards joined together, from Synth
 - One or more PartyKeys 36 boards with **firmware v9**.
 - macOS or 64-bit Windows, Synthesia, and a USB data connection to the keyboard.
 - Python 3.10 or newer for source installs. The executable downloads include Python.
-- A virtual MIDI bus: IAC on macOS, or a tool such as loopMIDI on Windows.
+- A virtual MIDI connection: created automatically by the Mac launcher, or a tool such as loopMIDI on Windows.
 
 Use [PartyKeys Hub](https://apps.apple.com/app/id6797699163) to update your keyboard. The update requires the keyboard to connect to Wi-Fi. Check the **keyboard firmware version**, which is separate from the Hub app version.
 
@@ -48,19 +48,19 @@ Always specify `--input` on Windows; automatic cue discovery currently looks for
 
 ## Set up Synthesia on macOS
 
-1. Open **Audio MIDI Setup → Window → Show MIDI Studio**.
-2. Open **IAC Driver**, enable **Device is online**, and add a bus named **Synthesia Lights**.
-3. In Synthesia's music-device settings, enable **PartyKeys** as a music input.
-4. Enable **IAC Driver Synthesia Lights** as a music output and set **Key Lights → Finger-based channel**.
-5. Turn off ordinary song-note, background, percussion, and metronome output on that IAC bus. Keep sound enabled through Synthesia's built-in synthesizer or another audio destination.
-6. Disable direct music output to PartyKeys and close any other apps controlling its LEDs.
-7. In the extracted Mac download, double-click **Start Synthesia bridge.command**, then start a song in Synthesia.
+1. Double-click **Start Synthesia bridge.command** in the extracted Mac download. It creates a MIDI destination named **Synthesia Lights** automatically. Leave the terminal open.
+2. In Synthesia's music-device settings, enable **PartyKeys** as a music input.
+3. Enable **Synthesia Lights** as a music output and set **Key Lights → Finger-based channel**.
+4. Turn off ordinary song-note, background, percussion, and metronome output on **Synthesia Lights**. Keep sound enabled through Synthesia's built-in synthesizer or another audio destination.
+5. Disable direct music output to PartyKeys and close any other apps controlling its LEDs, then start a song.
+
+There is no Audio MIDI Setup/IAC configuration or extra driver to install with this method. The MIDI destination exists while the bridge runs and disappears when it exits. Start the bridge before choosing the output in Synthesia. Synthesia's output selection is still a one-time manual step; the launcher does not edit Synthesia's settings. If another bridge already owns that destination, the new instance stops rather than creating a duplicate.
 
 For custom settings, open Terminal in the extracted folder and run:
 
 ```sh
 ./partykeys bridge \
-  --input "IAC Driver Synthesia Lights" \
+  --virtual-input --input "Synthesia Lights" \
   --output "PartyKeys" \
   --pressed-input "PartyKeys" \
   --palette-interval-ms 10
@@ -69,6 +69,8 @@ For custom settings, open Terminal in the extracted folder and run:
 Start a song in Synthesia. Press **Ctrl+C** in the terminal to clear the lights and exit.
 
 Port names can be exact names or unambiguous substrings. Use `./partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
+
+With `--virtual-input`, `--input` is the exact name to create, defaulting to **Synthesia Lights**. This option is macOS-only. Existing IAC setups still work: omit `--virtual-input` and use `--input "IAC Driver Synthesia Lights"`. To set up IAC manually, open **Audio MIDI Setup → Window → Show MIDI Studio → IAC Driver**, enable **Device is online**, and add a **Synthesia Lights** bus.
 
 For source installs, use `partykeys` instead of `./partykeys`. Elsewhere in this guide, replace `partykeys` with `./partykeys` for the Mac executable or `.\partykeys.exe` in Windows PowerShell.
 
@@ -113,7 +115,7 @@ partykeys bridge --input "Synthesia Lights" --debug
 For joined boards, use explicit destinations to prevent the same cue appearing on multiple boards. Repeat `--board CHANNEL:ADDRESS:LOWEST_NOTE` for each 36-key board, with its lowest note **at octave zero**. For example, a pair using routing channel 1, addresses `0x3f` and `0x40`, and lowest notes 48 and 84:
 
 ```sh
-partykeys bridge --input "IAC Driver Synthesia Lights" \
+partykeys bridge --virtual-input --input "Synthesia Lights" \
   --output "PartyKeys Bluetooth" --pressed-input "PartyKeys Bluetooth" \
   --palette-interval-ms 10 --board 1:0x3f:48 --board 1:0x40:84
 ```
@@ -155,7 +157,7 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 
 - **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
 - **Missing or mirrored lights on joined boards:** configure one `--board` destination per board as above, using octave-zero lowest notes. Keep the keyboard input enabled to follow octave buttons automatically; use `--initial-octave` if already shifted at startup. A song note outside your physical range has no key to light. Versions through v0.1.3 broadcast to all boards and do not support explicit destinations.
-- **No cues:** check the IAC or loopMIDI port and Synthesia's Key Lights setting. Keep ordinary music output off the lighting bus. `--debug` shows received messages.
+- **No cues:** keep the Mac bridge running so its **Synthesia Lights** output is available, or check your manual IAC/Windows loopMIDI port. Check Synthesia's Key Lights setting and keep ordinary music output off the lighting bus. `--debug` shows received messages.
 - **Delayed lights:** include `--palette-interval-ms 10`; the default is 250 ms. Synthesia controls when cues arrive.
 - **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.
 - **Shutdown:** cleanup is paced and may take several seconds. A second interrupt aborts remaining cleanup. An unplugged device or killed process cannot be cleared. The previous built-in LED animation is not restored.
@@ -183,15 +185,18 @@ partykeys test --dry-run --note 60 --seconds 0.1
 partykeys preview examples/demo.mid --dry-run --lookahead 0.2 --speed 2
 ```
 
-`--dry-run` sends no hardware LED output. Preview/test dry runs require no MIDI hardware; bridge dry runs still read a real cue input.
+`--dry-run` sends no hardware LED output. Preview/test dry runs require no MIDI hardware; bridge dry runs still read a cue input and create the temporary destination when `--virtual-input` is used.
 
 Optional macOS integration check:
 
 ```sh
 python tests/coremidi_smoke.py
+python tests/mac_virtual_input_smoke.py
 ```
 
 It opens only temporary virtual MIDI ports, verifies routing and cleanup, and has a 30-second watchdog. It does not send to the physical keyboard.
+
+The automatic-setup check tests destination creation, note-on/off routing, refresh, and destination removal without opening hardware ports. Mac executable builds also run it against the packaged binary.
 
 The driver handles RGB/palette framing and state; the bridge interprets cue/physical MIDI; connection management handles discovery and recovery; the song and preview modules handle independent playback. Input uses direct RtMidi polling.
 

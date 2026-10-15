@@ -11,8 +11,9 @@ from types import SimpleNamespace
 
 
 class Device:
-    def __init__(self, name):
+    def __init__(self, name, virtual=False):
         self.name, self.pending, self.sent = name, [], []
+        self.virtual = virtual
         self.closed = self.fail_send = False
 
     def iter_pending(self):
@@ -165,3 +166,59 @@ class ConnectionTests(unittest.TestCase):
         self.step()
         self.assertEqual(self.session.driver.octaves, {1: -1})
         self.assertEqual(tuple(self.session.driver.note_range), tuple(range(36,108)))
+
+    def virtual_session(self, name="Synthesia Lights"):
+        args = parser().parse_args(["bridge", "--virtual-input", "--input", name,
+                                    "--output", "PartyKeys", "--palette-interval-ms", "10"])
+        with patch("partykeys_bridge.connection.sys.platform", "darwin"):
+            session = BridgeConnection(args, Bridge(), now=lambda: self.now[0])
+        self.addCleanup(session.close)
+        return session
+
+    def test_virtual_destination_receives_cues_and_survives_refresh(self):
+        session = self.virtual_session()
+        session.tick()
+        cue = session.ports["cue"]
+        self.assertTrue(cue.virtual)
+        self.assertNotIn(cue.name, self.inputs)
+        self.outputs.append(cue.name)
+        self.now[0] += 2
+        session.tick()
+        self.assertIs(session.ports["cue"], cue)
+        cue.pending.append(mido.Message("note_on", channel=1, note=60))
+        self.now[0] += .1
+        session.tick()
+        self.assertIn(60, session.bridge.lights())
+        self.assertEqual(session.driver.state[12], session.bridge.left)
+        self.outputs.remove("PartyKeys")
+        self.now[0] += 2
+        session.tick()
+        self.assertIs(session.ports["cue"], cue)
+        self.assertIsNone(session.ports["output"])
+        session.close()
+        self.assertTrue(cue.closed)
+
+    def test_existing_destination_rejected_before_hardware_open(self):
+        self.outputs.append("Synthesia Lights")
+        session = self.virtual_session()
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            session.refresh()
+        self.assertTrue(all(port is None for port in session.ports.values()))
+
+    def test_virtual_destination_never_auto_selected_as_led_output(self):
+        session = self.virtual_session("PartyKeys Cues")
+        self.inputs = ["IAC Lights"]
+        self.outputs = []
+        session.refresh()
+        self.outputs = ["PartyKeys Cues"]
+        session.refresh()
+        self.assertIsNotNone(session.ports["cue"])
+        self.assertIsNone(session.ports["output"])
+
+    def test_virtual_option_rejected_on_windows_before_enumeration(self):
+        args = parser().parse_args(["bridge", "--virtual-input"])
+        with patch("partykeys_bridge.connection.sys.platform", "win32"), \
+                patch("mido.get_input_names") as inputs:
+            with self.assertRaisesRegex(ValueError, "macOS"):
+                BridgeConnection(args, Bridge())
+            inputs.assert_not_called()

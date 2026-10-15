@@ -48,6 +48,9 @@ jobs:
           --collect-all rtmidi packaging/entry.py
       - name: Test executable without MIDI hardware
         run: python scripts/smoke_executable.py dist/${{ matrix.executable }}
+      - name: Test automatic macOS MIDI destination
+        if: runner.os == 'macOS'
+        run: python tests/mac_virtual_input_smoke.py dist/${{ matrix.executable }}
       - name: Package executable and instructions
         run: python scripts/package_executable.py ${{ matrix.name }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

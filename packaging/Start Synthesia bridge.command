@@ -1,9 +1,11 @@
 #!/bin/sh
 cd "$(dirname "$0")" || exit 1
 printf '%s\n' 'PartyKeys bridge — keyboard firmware v9 required.'
-printf '%s\n' 'Enable the Synthesia Lights IAC bus and select it for Synthesia key lights.'
+printf '%s\n' 'This launcher creates the Synthesia Lights MIDI destination automatically.'
+printf '%s\n' 'In Synthesia, select that Music Output and set Key Lights to Finger-based channel.'
+printf '%s\n' 'Turn off ordinary notes, background, percussion and metronome on that output.'
 printf '%s\n' 'Press Ctrl+C to stop and clear lights.'
-./partykeys bridge --input "IAC Driver Synthesia Lights" --output PartyKeys --pressed-input PartyKeys --palette-interval-ms 10
+./partykeys bridge --virtual-input --input "Synthesia Lights" --output PartyKeys --pressed-input PartyKeys --palette-interval-ms 10 "$@"
 status=$?
 printf '%s\n' 'Press Return to close this window.'
 read -r answer

@@ -99,6 +99,8 @@ def parser():
         sub.add_argument("--right-channels", type=channels, default=None if mode == "bridge" else {0})
         if mode == "bridge":
             sub.add_argument("--input", help="Synthesia IAC bus name or unique substring (auto: IAC)")
+            sub.add_argument("--virtual-input", action="store_true",
+                             help="macOS: create the cue MIDI destination automatically; --input names it (default: Synthesia Lights)")
             sub.add_argument("--pressed-input", help="Physical keyboard input for held-key feedback (auto: PartyKeys)")
             sub.add_argument("--pressed-color", type=color, default=(0, 80, 255))
             sub.add_argument("--no-press-feedback", action="store_true", help="Disable physical held-key color")
@@ -129,7 +131,7 @@ class PrintPort:
         self.offset += seconds
 
     def send(self, message):
-        print("LED:", message.hex())
+        print("LED:", message.hex(), flush=True)
 
 
 class Commands:

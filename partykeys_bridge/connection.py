@@ -1,5 +1,6 @@
 """Recover hot-plugged MIDI endpoints without losing the live cue stream."""
 import logging
+import sys
 import time
 
 import mido
@@ -15,6 +16,12 @@ IO_ERRORS = (OSError, RuntimeError, rtmidi.RtMidiError)
 
 class BridgeConnection:
     def __init__(self, args, bridge, print_port=None, now=time.monotonic):
+        self.virtual_input = getattr(args, "virtual_input", False)
+        if self.virtual_input and sys.platform != "darwin":
+            raise ValueError("--virtual-input is supported on macOS; use a loopMIDI bus on Windows")
+        self.cue_name = args.input or "Synthesia Lights"
+        if self.virtual_input and not self.cue_name.strip():
+            raise ValueError("Virtual MIDI destination name cannot be empty")
         self.args, self.bridge, self.now = args, bridge, now
         self.ports = {"cue": None, "pressed": None, "output": None}
         self.names = {}
@@ -77,13 +84,24 @@ class BridgeConnection:
         if not self.args.dry_run:
             specs.append(("output", outputs, self.args.output, "partykeys"))
         for kind, available, requested, hint in specs:
+            virtual = kind == "cue" and self.virtual_input
+            if virtual:
+                if self.ports[kind]:
+                    continue  # A virtual destination isn't an enumerated MIDI source.
+                name = self.cue_name
+                if name in inputs or name in outputs:
+                    raise ValueError(f"MIDI destination {name!r} already exists. Stop the other bridge or choose another --input name.")
+            else:
+                if kind != "cue":
+                    available = [name for name in available if name != self.names.get("cue")]
             port = self.ports[kind]
-            if port and self.names[kind] not in available:
+            if not virtual and port and self.names[kind] not in available:
                 self.report(kind, f"{kind} port absent: {self.names[kind]}; waiting to reconnect.", True)
                 self.drop(kind)
             if self.ports[kind]:
                 continue
-            name = self.resolve(kind, available, requested, hint)
+            if not virtual:
+                name = self.resolve(kind, available, requested, hint)
             if name is None:
                 continue
             if kind in ("pressed", "output") and name == self.names.get("cue"):
@@ -91,13 +109,18 @@ class BridgeConnection:
             if kind == "cue" and name in (self.names.get("pressed"), self.names.get("output")):
                 raise ValueError("The Synthesia cue bus must differ from physical input and LED output")
             try:
-                self.ports[kind] = mido.open_output(name) if kind == "output" else MidiInput(name)
+                if virtual:
+                    self.ports[kind] = MidiInput(name, virtual=True)
+                else:
+                    self.ports[kind] = mido.open_output(name) if kind == "output" else MidiInput(name)
                 self.names[kind] = name
                 if kind == "output":
                     self.driver = make_driver(self.ports[kind], self.args)
                     self.restore_octaves()
                     self.driver.initialize(blocking=False)  # Clear gradually while inputs keep draining.
                 self.report(kind, f"Connected {kind}: {name}")
+                if virtual:
+                    LOG.info("In Synthesia, select Music Output → %s → Key Lights → Finger-based channel. Keep this bridge running.", name)
             except IO_ERRORS as error:
                 self.drop(kind)
                 self.report(kind, f"{kind} open failed: {error}; retrying.", True)
