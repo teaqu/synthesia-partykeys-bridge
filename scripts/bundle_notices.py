@@ -16,5 +16,8 @@ for name in ('mido', 'python-rtmidi', 'packaging', 'pyinstaller'):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
 python_license = Path(sys.base_prefix) / 'LICENSE.txt'
-if python_license.is_file():
-    shutil.copy2(python_license, root / 'Python-LICENSE.txt')
+if not python_license.is_file():
+    # CPython 3.12 license: https://github.com/python/cpython/blob/3.12/LICENSE
+    # setup-python's macOS distribution does not install LICENSE.txt.
+    python_license = Path(__file__).resolve().parents[1] / 'packaging' / 'PYTHON_LICENSE.txt'
+shutil.copy2(python_license, root / 'Python-LICENSE.txt')
