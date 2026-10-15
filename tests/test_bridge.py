@@ -1,4 +1,5 @@
 import tempfile
+import queue
 import subprocess
 import sys
 import unittest
@@ -9,7 +10,7 @@ from unittest.mock import Mock, patch
 import mido
 
 from partykeys_bridge.bridge import Bridge
-from partykeys_bridge.cli import check_connections, lights_session, parser
+from partykeys_bridge.cli import Commands, check_connections, lights_session, parser
 from partykeys_bridge.driver import MidiInput, PartyKeys, PalettePartyKeys, rgb_messages, select_port, make_driver
 from partykeys_bridge.preview import AudioPlayback, Preview, Transport
 from partykeys_bridge.song import Note, Song
@@ -55,6 +56,39 @@ class ClockedTests(unittest.TestCase):
         handle = patch("partykeys_bridge.driver.time", self.clock)
         handle.start()
         self.addCleanup(handle.stop)
+
+
+class WindowsCommandTests(unittest.TestCase):
+    def test_nonblocking_partial_lines_crlf_and_eof(self):
+        with patch('partykeys_bridge.cli.sys.platform', 'win32'), \
+                patch('partykeys_bridge.cli.sys.stdin') as stdin, \
+                patch('partykeys_bridge.cli.threading.Thread'):
+            stdin.fileno.return_value = 0
+            commands = Commands()
+        self.assertIsNone(commands.poll())
+        commands.chunks.put(b'pa')
+        self.assertIsNone(commands.poll())
+        commands.chunks.put(b'use\r\nspeed 2\r\nqu')
+        self.assertEqual(commands.poll(), ['pause'])
+        self.assertEqual(commands.poll(), ['speed', '2'])
+        commands.chunks.put(b'it')
+        self.assertIsNone(commands.poll())
+        commands.chunks.put(b'')
+        self.assertEqual(commands.poll(), ['quit'])
+        self.assertFalse(commands.open)
+
+    def test_reader_delivers_data_before_eof(self):
+        chunks = queue.SimpleQueue()
+        with patch('partykeys_bridge.cli.os.read', side_effect=[b'play\n', b'']):
+            Commands._read_windows(0, chunks)
+        self.assertEqual(chunks.get_nowait(), b'play\n')
+        self.assertEqual(chunks.get_nowait(), b'')
+
+    def test_closed_console_becomes_eof(self):
+        chunks = queue.SimpleQueue()
+        with patch('partykeys_bridge.cli.os.read', side_effect=OSError('console closed')):
+            Commands._read_windows(0, chunks)
+        self.assertEqual(chunks.get_nowait(), b'')
 
 
 class ProtocolTests(ClockedTests):

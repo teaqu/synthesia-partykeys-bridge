@@ -1,21 +1,42 @@
 # Synthesia → PartyKeys bridge
 
-Light a PartyKeys 36 keyboard from Synthesia on macOS, using the IAC MIDI bus. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
+Light a PartyKeys 36 keyboard from Synthesia on macOS or Windows, using a virtual MIDI cable. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
 
 > **Requires PartyKeys keyboard firmware v9 for the supported fast-lighting setup. Update before using the bridge.** Firmware v8.3 repeatedly reset during faster lighting tests. After an owner-reported upgrade to v9, the same keyboard passed tests at 40, 20, and 10 ms between small palette packets. The bridge does not automatically read or enforce the firmware version.
 
 ## Requirements
 
 - PartyKeys 36, updated to **firmware v9**. Later firmware versions have not been tested.
-- macOS, Synthesia, and a USB data connection to the keyboard.
-- Python 3.10 or newer; tested with Python 3.13.
-- An enabled IAC bus for Synthesia's key-light output.
+- macOS or 64-bit Windows, Synthesia, and a USB data connection to the keyboard.
+- Python 3.10 or newer for source installs. The Windows executable includes Python.
+- A virtual MIDI bus: IAC on macOS, or a tool such as loopMIDI on Windows.
 
 [PartyKeys Hub](https://apps.apple.com/app/id6797699163) is the official firmware updater. The tested keyboard was updated through Hub on an iPad. Its keyboard update flow requires the keyboard to join Wi-Fi even when controlled over USB. **Hub's app version is separate from the keyboard firmware version.**
 
 This is an independent community project, not an official Synthesia or PartyKeys integration.
 
-## Install
+## Windows executable
+
+Download **partykeys-windows-x64.zip** from [Releases](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) and extract it. Python is not required. The ZIP includes `partykeys.exe`, a launcher, this README, and the demo MIDI file. This is an unsigned console application for Windows x64.
+
+1. Install [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html), create a port named **Synthesia Lights**, and leave loopMIDI running.
+2. In Synthesia, use **PartyKeys** for music input. Set **Synthesia Lights** as a music output with **Key Lights → Finger-based channel**. Disable ordinary notes/background/percussion/metronome on that output; keep Synthesia's built-in audio enabled. Disable direct music output to PartyKeys.
+3. Double-click **Start Synthesia bridge.cmd**, then start a song in Synthesia. Press Ctrl+C in the console to stop.
+
+The launcher uses cue-only lighting (`--no-press-feedback`), so Synthesia owns the physical MIDI input. Windows MIDI drivers can restrict simultaneous access to the same hardware input. The bridge still lights requested notes and clears missed cues. If your driver supports shared input, omit `--no-press-feedback` to enable physical held-key feedback too.
+
+For custom port names, open PowerShell in the extracted folder:
+
+```powershell
+.\partykeys.exe ports
+.\partykeys.exe bridge --input "Synthesia Lights" --output "YOUR PARTYKEYS OUTPUT" --no-press-feedback --palette-interval-ms 10
+```
+
+Always specify `--input` on Windows; automatic cue discovery currently looks for macOS IAC. Windows has no built-in IAC bus, and the executable does not install a virtual MIDI driver. The workflow tests and runs the executable on Windows Server 2022 with Python 3.12. Physical PartyKeys + Synthesia behavior on a Windows PC has not yet been verified; the hardware tests below were on macOS.
+
+Every push to `main`, pull request, or manual [Windows executable workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/windows.yml) run builds a fresh ZIP and SHA-256 checksum as a downloadable Actions artifact. Releases provide stable downloads of selected builds.
+
+## Install from source
 
 ```sh
 git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
@@ -28,7 +49,7 @@ partykeys ports
 
 Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is available, installation may require macOS Command Line Tools.
 
-## Set up Synthesia
+## Set up Synthesia on macOS
 
 1. Open **Audio MIDI Setup → Window → Show MIDI Studio**.
 2. Open **IAC Driver**, enable **Device is online**, and add a bus named **Synthesia Lights**.
@@ -106,7 +127,7 @@ The owner then reported completing a **v9 update on an iPad**. The version was n
 
 The tests used bursts of small blue/on and explicit/off packets, with holds between bursts and five seconds of observation afterward. They do **not** establish sustained maximum throughput or stability on every keyboard. The 10 ms setting was then used for the live bridge. No vendor release note confirming the reset fix was available.
 
-There are **50 automated tests** covering framing, rate limits, batch cleanup, stale-cue cancellation, physical input, reconnection, and MIDI preview behavior. These tests do not prove physical LED behavior. Port enumeration alone is insufficient: PartyKeys remained listed during some earlier failures.
+There are **53 automated tests** covering framing, rate limits, batch cleanup, stale-cue cancellation, physical input, reconnection, Windows terminal input, and MIDI preview behavior. These tests do not prove physical LED behavior. Port enumeration alone is insufficient: PartyKeys remained listed during some earlier failures.
 
 ## Independent MIDI preview
 
@@ -141,6 +162,9 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 - **CoreMIDI native error in an automation sandbox:** run in a normal macOS Terminal. Native RtMidi aborts cannot be caught by Python.
 
 ## Development
+
+The Windows workflow runs the test suite, builds with PyInstaller on a Windows runner, and then exercises the actual EXE: help, native MIDI port enumeration, MIDI-file inspection, palette dry runs, and piped preview controls. Packaging explicitly includes Mido's dynamically loaded RtMidi backend and the native RtMidi files.
+
 
 ```sh
 python -m unittest discover -s tests -v

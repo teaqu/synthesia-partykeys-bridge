@@ -3,9 +3,11 @@ from contextlib import contextmanager, ExitStack
 import logging
 import math
 import os
+import queue
 import select
 import signal
 import sys
+import threading
 import time
 
 import mido
@@ -120,16 +122,44 @@ class Commands:
     """Nonblocking line input without TextIO read-ahead hiding pasted commands."""
     def __init__(self):
         self.buffer, self.open = b"", True
+        self.chunks = None
+        if sys.platform == "win32":
+            # Windows select() accepts sockets, not console or pipe handles.
+            # Read the raw descriptor on a daemon thread so stdin never blocks
+            # MIDI playback and no buffered-reader lock is held at shutdown.
+            self.chunks = queue.SimpleQueue()
+            threading.Thread(target=self._read_windows, args=(sys.stdin.fileno(), self.chunks),
+                             daemon=True).start()
+
+    @staticmethod
+    def _read_windows(fd, chunks):
+        try:
+            while True:
+                chunk = os.read(fd, 4096)
+                if not chunk:
+                    break
+                chunks.put(chunk)
+        except OSError:
+            pass  # A closed console is EOF.
+        finally:
+            chunks.put(b"")
 
     def poll(self):
-        if self.open and select.select([sys.stdin], [], [], 0)[0]:
-            chunk = os.read(sys.stdin.fileno(), 4096)
-            if chunk:
-                self.buffer += chunk
-            else:
-                self.open = False
-                if self.buffer and not self.buffer.endswith(b"\n"):
-                    self.buffer += b"\n"
+        chunk = None
+        if self.open:
+            if self.chunks is not None:
+                try:
+                    chunk = self.chunks.get_nowait()
+                except queue.Empty:
+                    pass
+            elif select.select([sys.stdin], [], [], 0)[0]:
+                chunk = os.read(sys.stdin.fileno(), 4096)
+        if chunk:
+            self.buffer += chunk
+        elif chunk == b"":
+            self.open = False
+            if self.buffer and not self.buffer.endswith(b"\n"):
+                self.buffer += b"\n"
         if b"\n" in self.buffer:
             line, self.buffer = self.buffer.split(b"\n", 1)
             return line.decode("utf-8", errors="replace").strip().split()
