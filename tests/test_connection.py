@@ -141,3 +141,27 @@ class ConnectionTests(unittest.TestCase):
         self.step()
         self.assertIsNone(self.session.driver)
         self.assertIsNone(self.session.ports["pressed"])
+
+    def test_hardware_octave_report_updates_routes_and_survives_output_reconnect(self):
+        self.session.args.protocol = "palette71"
+        self.session.args.palette_interval_ms = 10
+        self.session.args.board = [(1, 0x3f, 48), (1, 0x40, 84)]
+        self.step()
+        cue, pressed = self.session.ports["cue"], self.session.ports["pressed"]
+        cue.pending.append(mido.Message("note_on", note=80))
+        pressed.pending.append(mido.Message("note_on", note=80))
+        self.step()
+        message = mido.Message("sysex", data=[5,48,32,0,1,63,24,127,0])
+        cue.pending.append(message)  # A song's SysEx must not change hardware routing.
+        self.step()
+        self.assertEqual(self.session.driver.octaves, {1: 0})
+        pressed.pending.append(message)
+        self.step()
+        self.assertEqual(self.session.driver.octaves, {1: -1})
+        self.assertFalse(self.session.bridge.pressed)
+        self.assertIn(80, self.session.bridge.lights())
+        self.assertEqual(self.session.driver.routes[80], (1, 0x40))
+        self.session.drop("output")
+        self.step()
+        self.assertEqual(self.session.driver.octaves, {1: -1})
+        self.assertEqual(tuple(self.session.driver.note_range), tuple(range(36,108)))

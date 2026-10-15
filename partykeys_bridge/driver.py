@@ -14,6 +14,20 @@ KEY_COUNT = 36
 LOG = logging.getLogger("partykeys")
 
 
+def octave_report(message):
+    """Decode a keyboard CMD18 report, never a song's MIDI/transposition data."""
+    if message.type != "sysex":
+        return None
+    data = message.data
+    if (len(data) < 8 or data[0] not in (5, 0x7f) or data[1] != 0x30
+            or data[2:4] not in ((0x20, 0), (0x7e, 0x7e))
+            or not 1 <= data[4] <= 15 or not 0 <= data[5] <= 0x6f
+            or data[6] != 0x18):
+        return None
+    octave = data[7] - 128 if data[7] >= 64 else data[7]
+    return (data[4], octave) if -3 <= octave <= 3 else None
+
+
 class MidiInput:
     """Poll RtMidi directly, avoiding callback-thread teardown on macOS.
 
@@ -196,11 +210,80 @@ class PalettePartyKeys(PartyKeys):
     MIN_INTERVAL = 0.01  # Explicit fast option; retain 250 ms default for older firmware.
     BATCH_SIZE = 3  # 16-byte maximum; 40 frames passed the v8.3 USB-error test.
 
+    def __init__(self, *args, boards=(), initial_octave=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not isinstance(initial_octave, int) or not -3 <= initial_octave <= 3:
+            raise ValueError("Initial octave must be -3..3")
+        self.routes = {}
+        self.boards = tuple(boards)
+        self.octaves = {channel: initial_octave for channel, _, _ in self.boards}
+        destinations = set()
+        for channel, address, lowest in self.boards:
+            if not (1 <= channel <= 15 and 0 <= address <= 0x6f and 0 <= lowest <= 92):
+                raise ValueError("Board requires channel 1..15, address 0..111, and lowest note 0..92")
+            destination = (channel, address)
+            if destination in destinations:
+                raise ValueError("Each board destination must be unique")
+            destinations.add(destination)
+            for note in range(lowest, lowest + KEY_COUNT):
+                if note in self.routes:
+                    raise ValueError("Board note ranges must not overlap")
+                self.routes[note] = destination
+            LOG.info("Board channel %d address %#x: MIDI %d–%d", channel, address, lowest, lowest + 35)
+        self.routes = self._shifted_routes(self.octaves)
+
+    def _shifted_routes(self, octaves):
+        routes = {}
+        for channel, address, lowest in self.boards:
+            low = lowest + 12 * octaves[channel]
+            for note in range(max(0, low), min(128, low + KEY_COUNT)):
+                if note in routes:
+                    raise ValueError("Shifted board note ranges overlap")
+                routes[note] = (channel, address)
+        return routes
+
+    def set_octave(self, channel, octave):
+        if channel not in self.octaves or self.octaves[channel] == octave:
+            return False
+        if not isinstance(octave, int) or not -3 <= octave <= 3:
+            raise ValueError("Octave must be -3..3")
+        updated = dict(self.octaves)
+        updated[channel] = octave
+        try:
+            routes = self._shifted_routes(updated)
+        except ValueError:
+            LOG.warning("Ignoring octave report: shifted board ranges overlap")
+            return False
+        # Firmware can alter its LEDs when shifting. Repaint affected physical
+        # keys at their new pitches, including explicit offs for inactive keys.
+        self.state = {key: rgb for key, rgb in self.state.items()
+                      if self.routes.get(self.base_note + key, (None,))[0] != channel
+                      and routes.get(self.base_note + key) == self.routes.get(self.base_note + key)}
+        self.octaves, self.routes = updated, routes
+        LOG.info("Keyboard octave changed: channel %d, %+d; MIDI ranges %s", channel, octave,
+                 [(base + 12 * updated[ch], base + 12 * updated[ch] + 35)
+                  for ch, _, base in self.boards])
+        return True
+
     @property
     def note_range(self):
-        # CMD71 addresses MIDI pitches, unlike RGB15's physical key indices.
-        # Let the keyboard route pitches to its connected boards/octave range.
-        return range(128)
+        # Explicit destinations prevent broadcast mirroring on joined boards.
+        return tuple(sorted(self.routes)) if self.boards else range(128)
+
+    def _write_changes(self, changes):
+        # Keep each packet on one board, including release/cleanup packets.
+        # Preserve the caller's off-before-on order across board boundaries.
+        batch = {}
+        destination = None
+        for key, rgb in changes.items():
+            route = self.routes.get(self.base_note + key, (0x7f, 0x7f))
+            if batch and (route != destination or len(batch) == self.BATCH_SIZE):
+                super()._write_changes(batch)
+                batch = {}
+            destination = route
+            batch[key] = rgb
+        if batch:
+            super()._write_changes(batch)
 
     def _color(self, rgb):
         if not any(rgb):
@@ -214,10 +297,14 @@ class PalettePartyKeys(PartyKeys):
 
     def _batch_message(self, changes):
         pairs = []
+        destinations = {self.routes.get(self.base_note + key, (0x7f, 0x7f)) for key in changes}
+        if len(destinations) != 1:
+            raise ValueError("Palette packet must target exactly one board")
+        channel, address = destinations.pop()
         for key, rgb in changes.items():
             slot = 0 if rgb == BLACK else next(slot for slot, color in PALETTE.items() if color == rgb)
             pairs.extend((self.base_note + key, slot))
-        return mido.Message("sysex", data=(*HEADER, 0x71, len(changes), *pairs))
+        return mido.Message("sysex", data=(5, 0x30, channel, address, 0x20, 0, 0x71, len(changes), *pairs))
 
     def initialize(self, blocking=True):
         # Match the referenced implementation's executable code (0F01), not
@@ -237,8 +324,12 @@ class PalettePartyKeys(PartyKeys):
 
 def make_driver(port, args, **clock):
     cls = PalettePartyKeys if getattr(args, "protocol", "rgb15") == "palette71" else PartyKeys
+    boards = getattr(args, "board", ())
+    if boards and cls is not PalettePartyKeys:
+        raise ValueError("--board requires --protocol palette71")
     interval = getattr(args, "palette_interval_ms", 250) / 1000 if cls is PalettePartyKeys else cls.DEFAULT_INTERVAL
-    return cls(port, args.brightness, args.base_note, min_interval=interval, **clock)
+    options = {"boards": boards, "initial_octave": getattr(args, "initial_octave", 0)} if cls is PalettePartyKeys else {}
+    return cls(port, args.brightness, args.base_note, min_interval=interval, **options, **clock)
 
 
 def select_port(names, requested, hint):

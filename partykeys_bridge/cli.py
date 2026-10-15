@@ -55,6 +55,16 @@ def finite(value):
         raise argparse.ArgumentTypeError("Use a finite number")
 
 
+def board(value):
+    try:
+        parts = tuple(int(part, 0) for part in value.split(":"))
+        if len(parts) != 3:
+            raise ValueError()
+        return parts
+    except ValueError:
+        raise argparse.ArgumentTypeError("Use CHANNEL:ADDRESS:LOWEST_NOTE, e.g. 1:0x3f:48")
+
+
 def parser():
     p = argparse.ArgumentParser(description="PartyKeys 36: Synthesia lights and independent MIDI preview")
     commands = p.add_subparsers(dest="command", required=True)
@@ -71,6 +81,10 @@ def parser():
         sub.add_argument("--palette-interval-ms", type=int, choices=(10, 20, 40, 100, 250), default=250,
                          help="palette message spacing; default 250; faster rates require hardware validation")
         sub.add_argument("--base-note", type=int, default=48, help="MIDI note of leftmost key; default 48")
+        sub.add_argument("--board", type=board, action="append", default=[],
+                         help="Palette board CHANNEL:ADDRESS:LOWEST_NOTE at octave zero; repeat for joined boards")
+        sub.add_argument("--initial-octave", type=int, choices=range(-3, 4), default=0,
+                         help="Current board octave on startup; live hardware reports update it automatically")
         sub.add_argument("--debug", action="store_true")
         sub.add_argument("--dry-run", action="store_true", help="Print LED SysEx; do not open hardware outputs")
         if mode == "test":
@@ -285,7 +299,7 @@ def execute(args):
         inventory()
         return
     # Validate before opening a MIDI output or changing the keyboard.
-    PartyKeys(None, args.brightness, args.base_note)
+    make_driver(None, args)
     bridge = preview = song = None
     if args.command == "bridge":
         bridge = Bridge(args.left_color, args.right_color, args.left_channels, args.right_channels,

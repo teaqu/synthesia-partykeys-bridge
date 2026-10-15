@@ -110,7 +110,21 @@ partykeys bridge --input "Synthesia Lights" --palette-interval-ms 10 --no-press-
 partykeys bridge --input "Synthesia Lights" --debug
 ```
 
-Palette lighting forwards the full **MIDI 0–127** note range, including notes on joined boards and shifted octaves. Your keyboard routes each pitch to its matching key; notes outside your physical layout have no key to light. The optional RGB driver targets a single 36-key board: `--base-note` sets its leftmost note (default 48).
+For joined boards, use explicit destinations to prevent the same cue appearing on multiple boards. Repeat `--board CHANNEL:ADDRESS:LOWEST_NOTE` for each 36-key board, with its lowest note **at octave zero**. For example, a pair using routing channel 1, addresses `0x3f` and `0x40`, and lowest notes 48 and 84:
+
+```sh
+partykeys bridge --input "IAC Driver Synthesia Lights" \
+  --output "PartyKeys Bluetooth" --pressed-input "PartyKeys Bluetooth" \
+  --palette-interval-ms 10 --board 1:0x3f:48 --board 1:0x40:84
+```
+
+Use your device's actual port names, routing channel, addresses, and note ranges. The routing channel is the PartyKeys protocol value, not Synthesia's finger channel. This option routes lighting only; it does not assign device addresses, change the keyboard's octave, or transpose music.
+
+**Octave buttons work automatically while the bridge is running.** The bridge reads the keyboard's octave reports, shifts all configured boards on that routing channel, clears stale held-key feedback, and redraws the current song cues. Keep the physical input enabled for this (`--pressed-input`); `--no-press-feedback` closes that input and therefore disables automatic octave detection too.
+
+If the keyboard is already shifted before starting the bridge, pass its current setting with `--initial-octave -1` (one octave down, for example). Keep the `--board` lowest notes at their octave-zero values. Later button presses override this starting value automatically; the bridge also preserves the latest reported octave when reconnecting its output. Octave changes made while the physical input is disconnected cannot be observed until the keyboard sends another report.
+
+Notes outside the physical ranges stay unlit. Without `--board`, palette mode broadcasts MIDI 0–127, which can mirror lights on joined boards. The optional RGB driver supports a single 36-key board: `--base-note` sets its leftmost note (default 48); `--board` requires palette mode.
 
 Finger-channel defaults use 1-based MIDI channels: left **2–6, 12**; right **1, 7–11, 13**. Override these with `--left-channels` and `--right-channels`. A channel-1 release clears that pitch across all cue channels to handle Synthesia’s shared release channel. Physical held-key state remains separate. Note On with velocity zero is a release; CC16 on channel 1, CC120/123, and MIDI Stop/Reset clear applicable cue state.
 
@@ -140,7 +154,7 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 ## Troubleshooting
 
 - **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
-- **Missing low/high lights on joined boards:** use v0.1.3 or newer with the default palette driver. Earlier versions incorrectly limited lighting to MIDI 48–83.
+- **Missing or mirrored lights on joined boards:** configure one `--board` destination per board as above, using octave-zero lowest notes. Keep the keyboard input enabled to follow octave buttons automatically; use `--initial-octave` if already shifted at startup. A song note outside your physical range has no key to light. Versions through v0.1.3 broadcast to all boards and do not support explicit destinations.
 - **No cues:** check the IAC or loopMIDI port and Synthesia's Key Lights setting. Keep ordinary music output off the lighting bus. `--debug` shows received messages.
 - **Delayed lights:** include `--palette-interval-ms 10`; the default is 250 ms. Synthesia controls when cues arrive.
 - **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.

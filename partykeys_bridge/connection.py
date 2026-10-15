@@ -5,7 +5,7 @@ import time
 import mido
 import rtmidi
 
-from .driver import MidiInput, make_driver, select_port
+from .driver import MidiInput, PalettePartyKeys, make_driver, octave_report, select_port
 
 LOG = logging.getLogger("partykeys")
 # InvalidPortError inherits ValueError, not RuntimeError/OSError. Catch the
@@ -22,6 +22,12 @@ class BridgeConnection:
         self.driver = None
         self.next_scan = 0
         self.print_port = print_port
+        self.keyboard_octaves = {}
+
+    def restore_octaves(self):
+        if isinstance(self.driver, PalettePartyKeys):
+            for channel, octave in self.keyboard_octaves.items():
+                self.driver.set_octave(channel, octave)
 
     def report(self, key, message, warning=False):
         if self.status.get(key) != message:
@@ -89,6 +95,7 @@ class BridgeConnection:
                 self.names[kind] = name
                 if kind == "output":
                     self.driver = make_driver(self.ports[kind], self.args)
+                    self.restore_octaves()
                     self.driver.initialize(blocking=False)  # Clear gradually while inputs keep draining.
                 self.report(kind, f"Connected {kind}: {name}")
             except IO_ERRORS as error:
@@ -97,6 +104,7 @@ class BridgeConnection:
         if self.args.dry_run and self.driver is None:
             self.driver = make_driver(self.print_port, self.args,
                                       now=self.print_port.now, sleep=self.print_port.sleep)
+            self.restore_octaves()
             self.driver.initialize(blocking=False)
 
     def tick(self):
@@ -112,6 +120,18 @@ class BridgeConnection:
                     if kind == "cue":
                         self.bridge.receive(message)
                     else:
+                        report = octave_report(message)
+                        configured = getattr(self.args, "board", ())
+                        if report is not None and any(
+                                (channel, address) == (report[0], message.data[5])
+                                for channel, address, _ in configured):
+                            channel, octave = report
+                            self.keyboard_octaves[channel] = octave
+                            if isinstance(self.driver, PalettePartyKeys):
+                                if self.driver.set_octave(channel, octave):
+                                    # Held notes can be released under new pitches after
+                                    # a shift. Do not leave the old pitches stuck blue.
+                                    self.bridge.pressed.clear()
                         self.bridge.receive_pressed(message)
                         if self.driver and message.type in ("note_on", "note_off"):
                             self.driver.invalidate_note(message.note)

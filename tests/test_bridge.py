@@ -11,7 +11,7 @@ import mido
 
 from partykeys_bridge.bridge import Bridge
 from partykeys_bridge.cli import Commands, check_connections, lights_session, parser
-from partykeys_bridge.driver import MidiInput, PartyKeys, PalettePartyKeys, rgb_messages, select_port, make_driver
+from partykeys_bridge.driver import MidiInput, PartyKeys, PalettePartyKeys, octave_report, rgb_messages, select_port, make_driver
 from partykeys_bridge.preview import AudioPlayback, Preview, Transport
 from partykeys_bridge.song import Note, Song
 
@@ -56,6 +56,105 @@ class ClockedTests(unittest.TestCase):
         handle = patch("partykeys_bridge.driver.time", self.clock)
         handle.start()
         self.addCleanup(handle.stop)
+
+
+class JoinedBoardTests(ClockedTests):
+    def driver(self, port=None):
+        return PalettePartyKeys(port or Port(), min_interval=.01,
+                                boards=[(1, 0x3f, 48), (1, 0x40, 84)])
+
+    def test_full_width_targets_and_cleanup(self):
+        driver = self.driver()
+        driver.initialize()
+        driver.port.sent.clear()
+        driver.show({n: (0, 80, 255) for n in range(128)}, force=True)
+        self.assertEqual(len(driver.port.sent), 24)
+        lit = []
+        for message in driver.port.sent:
+            data = message.data
+            self.assertEqual(data[:3], (5, 0x30, 1))
+            self.assertEqual(data[6:8], (0x71, 3))
+            notes = data[8::2]
+            self.assertTrue(all((48 <= n < 84 if data[3] == 0x3f else 84 <= n < 120) for n in notes))
+            self.assertEqual(data[9::2], (9, 9, 9))
+            lit.extend(notes)
+        self.assertEqual(lit, list(range(48, 120)))
+        driver.port.sent.clear()
+        driver.clear()
+        self.assertEqual(len(driver.port.sent), 24)
+        self.assertTrue(all(set(m.data[9::2]) == {0} for m in driver.port.sent))
+        self.assertTrue(all(m.data[3] in (0x3f, 0x40) for m in driver.port.sent))
+
+    def test_cross_board_release_before_on_and_pressed_invalidation(self):
+        driver = self.driver()
+        driver.initialize()
+        driver.show({84: (0, 80, 255)}, force=True)
+        driver.port.sent.clear()
+        driver.show({48: (0, 80, 255)}, force=True)
+        self.assertEqual([(m.data[3], m.data[8:]) for m in driver.port.sent],
+                         [(0x40, (84, 0)), (0x3f, (48, 9))])
+        driver.port.sent.clear()
+        driver.invalidate_note(48)
+        driver.show({48: (0, 80, 255)}, force=True)
+        self.assertEqual(driver.port.sent[0].data[3], 0x3f)
+
+    def test_failed_second_board_does_not_commit_its_state(self):
+        driver = self.driver()
+        driver.initialize()
+        driver.port.send = Mock(side_effect=[None, OSError("disconnected")])
+        with self.assertRaises(OSError):
+            driver.show({83: (0, 80, 255), 84: (0, 80, 255)}, force=True)
+        self.assertEqual(driver.state[83 - 48], (0, 80, 255))
+        self.assertEqual(driver.state[84 - 48], (0, 0, 0))
+
+    def test_configuration_validation_before_hardware(self):
+        for flags in (["--board", "1:0x3f:48", "--board", "1:0x40:80"],
+                      ["--board", "1:0x3f:48", "--board", "1:0x3f:84"],
+                      ["--board", "0:0x3f:48"], ["--board", "1:0x7f:48"],
+                      ["--board", "1:0x40:93"],
+                      ["--board", "1:0x3f:48", "--protocol", "rgb15"]):
+            args = parser().parse_args(["bridge", *flags])
+            with self.subTest(flags=flags), self.assertRaises(ValueError):
+                make_driver(None, args)
+        args = parser().parse_args(["bridge", "--board", "1:0x3f:48", "--board", "1:64:84"])
+        self.assertEqual(tuple(make_driver(None, args).note_range), tuple(range(48, 120)))
+
+    def test_octave_report_accepts_real_button_messages_only(self):
+        for value, expected in ((127, -1), (126, -2), (0, 0), (3, 3)):
+            message = mido.Message("sysex", data=[5, 48, 32, 0, 1, 63, 24, value, 0])
+            self.assertEqual(octave_report(message), (1, expected))
+        for data in ([5, 48, 32, 0, 1, 63, 24], [5, 48, 32, 0, 1, 63, 24, 4],
+                     [5, 48, 127, 127, 1, 63, 24, 127], [5, 48, 32, 0, 0, 63, 24, 127],
+                     [5, 48, 32, 0, 1, 63, 2, 127]):
+            self.assertIsNone(octave_report(mido.Message("sysex", data=data)))
+        self.assertIsNone(octave_report(mido.Message("note_on", note=48)))
+
+    def test_octave_remaps_boundary_and_repaints_inactive_keys(self):
+        driver = self.driver()
+        driver.initialize()
+        driver.show({80: (0, 80, 255)}, force=True)  # Initially on left board.
+        self.assertTrue(driver.set_octave(1, -1))
+        self.assertEqual(tuple(driver.note_range), tuple(range(36, 108)))
+        driver.port.sent.clear()
+        driver.show({80: (0, 80, 255)}, force=True)
+        self.assertEqual(driver.port.sent[-1].data[3], 0x40)  # Same cue now on right.
+        self.assertEqual(driver.port.sent[-1].data[-2:], (80, 9))
+        cleared = {(m.data[3], n) for m in driver.port.sent for n, slot in zip(m.data[8::2], m.data[9::2]) if slot == 0}
+        self.assertIn((0x3f, 68), cleared)  # Old physical key is explicitly dark.
+        self.assertFalse(driver.set_octave(1, -1))  # Duplicate doesn't erase cache.
+        self.assertEqual(driver.state[80 - 48], (0, 80, 255))
+        driver.set_octave(1, 0)
+        self.assertEqual(tuple(driver.note_range), tuple(range(48, 120)))
+
+    def test_initial_octave_and_midi_bounds(self):
+        args = parser().parse_args(["bridge", "--board", "1:0x3f:48", "--board", "1:0x40:84", "--initial-octave", "-1"])
+        driver = make_driver(Port(), args)
+        self.assertEqual(tuple(driver.note_range), tuple(range(36, 108)))
+        driver.set_octave(1, 3)
+        self.assertEqual(tuple(driver.note_range), tuple(range(84, 128)))
+        driver.initialize()
+        driver.show({127: (0, 80, 255)}, force=True)
+        self.assertEqual(driver.port.sent[-1].data[8:], (127, 9))
 
 
 class WindowsCommandTests(unittest.TestCase):
