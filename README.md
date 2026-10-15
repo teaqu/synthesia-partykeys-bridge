@@ -2,22 +2,34 @@
 
 Light a PartyKeys 36 keyboard from Synthesia on macOS or Windows, using a virtual MIDI cable. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
 
-> **Requires PartyKeys keyboard firmware v9 for the supported fast-lighting setup. Update before using the bridge.** Firmware v8.3 repeatedly reset during faster lighting tests. After an owner-reported upgrade to v9, the same keyboard passed tests at 40, 20, and 10 ms between small palette packets. The bridge does not automatically read or enforce the firmware version.
+> **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
 ## Requirements
 
-- PartyKeys 36, updated to **firmware v9**. Later firmware versions have not been tested.
+- PartyKeys 36 with **firmware v9**.
 - macOS or 64-bit Windows, Synthesia, and a USB data connection to the keyboard.
-- Python 3.10 or newer for source installs. The Windows executable includes Python.
+- Python 3.10 or newer for source installs. The executable downloads include Python.
 - A virtual MIDI bus: IAC on macOS, or a tool such as loopMIDI on Windows.
 
-[PartyKeys Hub](https://apps.apple.com/app/id6797699163) is the official firmware updater. The tested keyboard was updated through Hub on an iPad. Its keyboard update flow requires the keyboard to join Wi-Fi even when controlled over USB. **Hub's app version is separate from the keyboard firmware version.**
+Use [PartyKeys Hub](https://apps.apple.com/app/id6797699163) to update your keyboard. The update requires the keyboard to connect to Wi-Fi. Check the **keyboard firmware version**, which is separate from the Hub app version.
+
+Only **macOS has been tested with a physical keyboard so far**. Windows builds are available, but keyboard operation on Windows has not yet been tested.
 
 This is an independent community project, not an official Synthesia or PartyKeys integration.
 
-## Windows executable
+## Download
 
-Download **partykeys-windows-x64.zip** from [Releases](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) and extract it. Python is not required. The ZIP includes `partykeys.exe`, a launcher, this README, and the demo MIDI file. This is an unsigned console application for Windows x64.
+Get the executable for your computer from [GitHub Releases](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest). **No Python installation is needed.**
+
+| Computer | Download |
+| --- | --- |
+| Mac with Apple Silicon (M1 or newer), macOS 14+ | `partykeys-macos-arm64.zip` |
+| Mac with an Intel processor, macOS 15+ | `partykeys-macos-x64.zip` |
+| 64-bit Windows PC | `partykeys-windows-x64.zip` |
+
+Extract the ZIP before running it. Each download includes a command-line executable, a launcher, this guide, a demo MIDI file, and license notices. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
+
+## Set up on Windows
 
 1. Install [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html), create a port named **Synthesia Lights**, and leave loopMIDI running.
 2. In Synthesia, use **PartyKeys** for music input. Set **Synthesia Lights** as a music output with **Key Lights → Finger-based channel**. Disable ordinary notes/background/percussion/metronome on that output; keep Synthesia's built-in audio enabled. Disable direct music output to PartyKeys.
@@ -32,22 +44,7 @@ For custom port names, open PowerShell in the extracted folder:
 .\partykeys.exe bridge --input "Synthesia Lights" --output "YOUR PARTYKEYS OUTPUT" --no-press-feedback --palette-interval-ms 10
 ```
 
-Always specify `--input` on Windows; automatic cue discovery currently looks for macOS IAC. Windows has no built-in IAC bus, and the executable does not install a virtual MIDI driver. The workflow tests and runs the executable on Windows Server 2022 with Python 3.12. Physical PartyKeys + Synthesia behavior on a Windows PC has not yet been verified; the hardware tests below were on macOS.
-
-Every push to `main`, pull request, or manual [Windows executable workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/windows.yml) run builds a fresh ZIP and SHA-256 checksum as a downloadable Actions artifact. Releases provide stable downloads of selected builds.
-
-## Install from source
-
-```sh
-git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
-cd synthesia-partykeys-bridge
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-partykeys ports
-```
-
-Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is available, installation may require macOS Command Line Tools.
+Always specify `--input` on Windows; automatic cue discovery currently looks for macOS IAC. Windows has no built-in IAC bus, and the executable does not install a virtual MIDI driver.
 
 ## Set up Synthesia on macOS
 
@@ -57,10 +54,12 @@ Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is avai
 4. Enable **IAC Driver Synthesia Lights** as a music output and set **Key Lights → Finger-based channel**.
 5. Turn off ordinary song-note, background, percussion, and metronome output on that IAC bus. Keep sound enabled through Synthesia's built-in synthesizer or another audio destination.
 6. Disable direct music output to PartyKeys and close any other apps controlling its LEDs.
-7. Start the bridge:
+7. In the extracted Mac download, double-click **Start Synthesia bridge.command**, then start a song in Synthesia.
+
+For custom settings, open Terminal in the extracted folder and run:
 
 ```sh
-partykeys bridge \
+./partykeys bridge \
   --input "IAC Driver Synthesia Lights" \
   --output "PartyKeys" \
   --pressed-input "PartyKeys" \
@@ -69,7 +68,9 @@ partykeys bridge \
 
 Start a song in Synthesia. Press **Ctrl+C** in the terminal to clear the lights and exit.
 
-Port names can be exact names or unambiguous substrings. Use `partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
+Port names can be exact names or unambiguous substrings. Use `./partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
+
+For source installs, use `partykeys` instead of `./partykeys`. Elsewhere in this guide, replace `partykeys` with `./partykeys` for the Mac executable or `.\partykeys.exe` in Windows PowerShell.
 
 ## Lighting behavior and speed
 
@@ -77,13 +78,13 @@ Port names can be exact names or unambiguous substrings. Use `partykeys ports` t
 - A missed cue goes dark when Synthesia sends its release. A key still physically held stays blue until released.
 - Physical input is used only for LED feedback; the bridge does not duplicate the notes Synthesia receives.
 - Releases clear obsolete lights before new cues are illuminated. Pending updates use the latest state, so old chords do not build up in a queue.
-- Live lighting follows Synthesia's key-light messages. There is no verified separate approaching/active transition or arbitrary lookahead in that stream. Timed advance lighting is available only in the independent MIDI-file preview below.
+- Live lighting follows Synthesia's key-light messages. The bridge uses one cue color and does not add advance timing to Synthesia. Timed advance lighting is available only in the independent MIDI-file preview below.
 
 Palette mode (`palette71`, the bridge default) sends up to **three note/color pairs per packet**, at most 16 bytes. It enters lighting mode once, uses explicit per-note off messages, and never sends the global `71 00` all-off command.
 
 | `--palette-interval-ms` | Maximum packet rate | Use |
 | --- | --- | --- |
-| `10` | 100/second | Fast setting tested after the reported v9 update |
+| `10` | 100/second | Recommended for responsive lighting |
 | `20` | 50/second | Slower alternative |
 | `40` | 25/second | Slower alternative |
 | `100` | 10/second | Diagnostic option |
@@ -91,9 +92,9 @@ Palette mode (`palette71`, the bridge default) sends up to **three note/color pa
 
 These are minimum send intervals, not measured end-to-end LED latency. Every write, including forced updates and cleanup, is paced. A three-note chord fits in one packet; larger changes take multiple packets. The main loop polls every 10 ms.
 
-The CLI keeps a conservative 250 ms default. **Pass `--palette-interval-ms 10` for the fast setup above.** Slower settings do not make firmware v8.3 a supported configuration.
+The CLI keeps a conservative 250 ms default. **Pass `--palette-interval-ms 10` for the fast setup above.** Firmware v9 is required at every speed.
 
-Palette colors have fixed device brightness; `--brightness` does not dim them. The optional `--protocol rgb15` uses custom RGB colors, one key per 250 ms, and a full startup clear that takes about ten seconds. Faster RGB operation has not been validated after the update.
+Palette colors have fixed device brightness; `--brightness` does not dim them. The optional `--protocol rgb15` uses custom RGB colors, one key per 250 ms, and a full startup clear that takes about ten seconds. Use palette mode for responsive Synthesia lighting.
 
 ### Options
 
@@ -111,23 +112,7 @@ partykeys bridge --input "Synthesia Lights" --debug
 
 Normal note range is **MIDI 48–83** (36 keys). `--base-note` changes the leftmost MIDI note to match a transposed keyboard; out-of-range notes are ignored.
 
-Finger-channel defaults use 1-based MIDI channels: left **2–6, 12**; right **1, 7–11, 13**. Override these with `--left-channels` and `--right-channels`. Synthesia was observed sending finger-channel onsets with releases on common channel 1; a channel-1 release therefore clears that pitch across all cue channels. Physical held-key state remains separate. Note On with velocity zero is a release; CC16 on channel 1, CC120/123, and MIDI Stop/Reset clear applicable cue state.
-
-## Firmware and hardware validation
-
-On the tested unit, Hub initially reported **v8.3**. Faster RGB and palette tests caused multicoloured lighting resets and macOS USB MIDI teardown errors. A separate native CoreMIDI sender reproduced the failure. The official updater's Wi-Fi attempts also triggered repeated USB teardown events while the bridge was stopped.
-
-The owner then reported completing a **v9 update on an iPad**. The version was not independently reread afterward. Tests on the reconnected keyboard produced:
-
-| Palette spacing | Packets | Individual key changes | Result |
-| --- | --- | --- | --- |
-| 40 ms | 160 | 480 | No USB teardown detected |
-| 20 ms | 240 | 720 | No USB teardown detected |
-| 10 ms | 240 | 720 | No USB teardown detected |
-
-The tests used bursts of small blue/on and explicit/off packets, with holds between bursts and five seconds of observation afterward. They do **not** establish sustained maximum throughput or stability on every keyboard. The 10 ms setting was then used for the live bridge. No vendor release note confirming the reset fix was available.
-
-There are **53 automated tests** covering framing, rate limits, batch cleanup, stale-cue cancellation, physical input, reconnection, Windows terminal input, and MIDI preview behavior. These tests do not prove physical LED behavior. Port enumeration alone is insufficient: PartyKeys remained listed during some earlier failures.
+Finger-channel defaults use 1-based MIDI channels: left **2–6, 12**; right **1, 7–11, 13**. Override these with `--left-channels` and `--right-channels`. A channel-1 release clears that pitch across all cue channels to handle Synthesia’s shared release channel. Physical held-key state remains separate. Note On with velocity zero is a release; CC16 on channel 1, CC120/123, and MIDI Stop/Reset clear applicable cue state.
 
 ## Independent MIDI preview
 
@@ -154,17 +139,28 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 
 ## Troubleshooting
 
-- **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Reduce the interval rate while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
-- **No cues:** check the IAC bus and Synthesia's Key Lights setting. Keep ordinary music output off the lighting bus. `--debug` shows received messages.
+- **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
+- **No cues:** check the IAC or loopMIDI port and Synthesia's Key Lights setting. Keep ordinary music output off the lighting bus. `--debug` shows received messages.
 - **Delayed lights:** include `--palette-interval-ms 10`; the default is 250 ms. Synthesia controls when cues arrive.
 - **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.
 - **Shutdown:** cleanup is paced and may take several seconds. A second interrupt aborts remaining cleanup. An unplugged device or killed process cannot be cleared. The previous built-in LED animation is not restored.
-- **CoreMIDI native error in an automation sandbox:** run in a normal macOS Terminal. Native RtMidi aborts cannot be caught by Python.
+
+## Install from source on macOS
+
+```sh
+git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
+cd synthesia-partykeys-bridge
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+partykeys ports
+```
+
+Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is available, installation may require macOS Command Line Tools.
 
 ## Development
 
-The Windows workflow runs the test suite, builds with PyInstaller on a Windows runner, and then exercises the actual EXE: help, native MIDI port enumeration, MIDI-file inspection, palette dry runs, and piped preview controls. Packaging explicitly includes Mido's dynamically loaded RtMidi backend and the native RtMidi files.
-
+The [Executables workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml) builds Windows x64, macOS Apple Silicon, and macOS Intel downloads on native runners. Each build runs the test suite and checks the packaged executable: help, MIDI port enumeration, MIDI-file inspection, dry-run lighting, and preview controls. Every push to `main`, pull request, or manual workflow run produces ZIPs and SHA-256 checksums. Releases provide stable downloads of selected builds.
 
 ```sh
 python -m unittest discover -s tests -v
@@ -182,11 +178,11 @@ python tests/coremidi_smoke.py
 
 It opens only temporary virtual MIDI ports, verifies routing and cleanup, and has a 30-second watchdog. It does not send to the physical keyboard.
 
-The driver handles RGB/palette framing and state; the bridge interprets cue/physical MIDI; connection management handles discovery and recovery; the song and preview modules handle independent playback. Input uses direct RtMidi polling to avoid a callback-thread shutdown hang reproduced during development.
+The driver handles RGB/palette framing and state; the bridge interprets cue/physical MIDI; connection management handles discovery and recovery; the song and preview modules handle independent playback. Input uses direct RtMidi polling.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). Bundled dependencies retain their own licenses, included in `THIRD_PARTY_LICENSES` in the Windows distribution.
+This project is licensed under the [MIT License](LICENSE). Bundled dependencies retain their own licenses, included in `THIRD_PARTY_LICENSES` in each executable download.
 
 ## References and acknowledgments
 

@@ -1,4 +1,4 @@
-"""Preserve licenses shipped by dependencies in the Windows distribution."""
+"""Preserve licenses shipped by dependencies in the executable distribution."""
 from importlib.metadata import distribution
 from pathlib import Path
 import shutil
