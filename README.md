@@ -1,12 +1,12 @@
 # Synthesia → PartyKeys bridge
 
-Light a PartyKeys 36 keyboard from Synthesia on macOS or Windows, using a virtual MIDI cable. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
+Light PartyKeys keyboards, including multiple boards joined together, from Synthesia on macOS or Windows using a virtual MIDI cable. Requested notes and physically held keys light blue; keys return to dark when neither is active, including notes you miss.
 
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
 ## Requirements
 
-- PartyKeys 36 with **firmware v9**.
+- One or more PartyKeys 36 boards with **firmware v9**.
 - macOS or 64-bit Windows, Synthesia, and a USB data connection to the keyboard.
 - Python 3.10 or newer for source installs. The executable downloads include Python.
 - A virtual MIDI bus: IAC on macOS, or a tool such as loopMIDI on Windows.
@@ -110,7 +110,7 @@ partykeys bridge --input "Synthesia Lights" --palette-interval-ms 10 --no-press-
 partykeys bridge --input "Synthesia Lights" --debug
 ```
 
-Normal note range is **MIDI 48–83** (36 keys). `--base-note` changes the leftmost MIDI note to match a transposed keyboard; out-of-range notes are ignored.
+Palette lighting forwards the full **MIDI 0–127** note range, including notes on joined boards and shifted octaves. Your keyboard routes each pitch to its matching key; notes outside your physical layout have no key to light. The optional RGB driver targets a single 36-key board: `--base-note` sets its leftmost note (default 48).
 
 Finger-channel defaults use 1-based MIDI channels: left **2–6, 12**; right **1, 7–11, 13**. Override these with `--left-channels` and `--right-channels`. A channel-1 release clears that pitch across all cue channels to handle Synthesia’s shared release channel. Physical held-key state remains separate. Note On with velocity zero is a release; CC16 on channel 1, CC120/123, and MIDI Stop/Reset clear applicable cue state.
 
@@ -140,6 +140,7 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 ## Troubleshooting
 
 - **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
+- **Missing low/high lights on joined boards:** use v0.1.3 or newer with the default palette driver. Earlier versions incorrectly limited lighting to MIDI 48–83.
 - **No cues:** check the IAC or loopMIDI port and Synthesia's Key Lights setting. Keep ordinary music output off the lighting bus. `--debug` shows received messages.
 - **Delayed lights:** include `--palette-interval-ms 10`; the default is 250 ms. Synthesia controls when cues arrive.
 - **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.

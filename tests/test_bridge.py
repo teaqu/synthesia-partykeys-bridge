@@ -210,6 +210,34 @@ class ProtocolTests(ClockedTests):
 
 
 class PaletteTests(ClockedTests):
+    def test_extended_midi_range_and_cleanup(self):
+        # A joined/transposed keyboard can play beyond a single board's 48..83.
+        driver = PalettePartyKeys(Port(), min_interval=.01)
+        driver.initialize()
+        driver.port.sent.clear()
+        notes = {n: (0, 80, 255) for n in (0, 36, 47, 84, 98, 127)}
+        driver.show(notes, force=True)
+        pairs = [pair for msg in driver.port.sent
+                 for pair in zip(msg.data[8::2], msg.data[9::2])]
+        self.assertEqual(pairs, [(n, 9) for n in notes])
+        driver.port.sent.clear()
+        driver.clear()
+        pairs = [pair for msg in driver.port.sent
+                 for pair in zip(msg.data[8::2], msg.data[9::2])]
+        self.assertEqual(pairs, [(n, 0) for n in notes])
+        self.assertTrue(all(1 <= msg.data[7] <= 3 for msg in driver.port.sent))
+
+    def test_extended_physical_feedback_reasserts_and_releases(self):
+        driver = PalettePartyKeys(Port(), base_note=36, min_interval=.01)
+        driver.initialize()
+        driver.show({98: (0, 80, 255)}, force=True)
+        driver.invalidate_note(98)
+        driver.show({98: (0, 80, 255)}, force=True)
+        self.assertEqual(tuple(driver.port.sent[-1].data[8:]), (98, 9))
+        driver.invalidate_note(98)
+        driver.show({}, force=True)
+        self.assertEqual(tuple(driver.port.sent[-1].data[8:]), (98, 0))
+
     def test_init_only_then_exact_blue_yellow_red_and_individual_off(self):
         port = Port()
         times = []

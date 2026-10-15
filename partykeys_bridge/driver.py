@@ -2,6 +2,7 @@
 
 Mido supplies F0/F7 framing. All payload values must be seven-bit safe.
 """
+import logging
 import math
 import time
 
@@ -10,6 +11,7 @@ import mido
 HEADER = (0x05, 0x30, 0x7F, 0x7F, 0x20, 0x00)
 BLACK = (0, 0, 0)
 KEY_COUNT = 36
+LOG = logging.getLogger("partykeys")
 
 
 class MidiInput:
@@ -92,6 +94,11 @@ class PartyKeys:
         self.initializing = False
         self.ready_at = 0
 
+    @property
+    def note_range(self):
+        """Notes addressable by this protocol, before converting to key indices."""
+        return range(self.base_note, self.base_note + KEY_COUNT)
+
     def _send(self, message):
         deadline = self.last_send + self.min_interval
         while self.now() < deadline:
@@ -112,6 +119,7 @@ class PartyKeys:
             batch = {key: changes[key] for key in keys[start:start + self.BATCH_SIZE]}
             self._send(self._batch_message(batch))
             self.state.update(batch)  # Commit only successfully written keys.
+            LOG.debug("LED changes: %s", {self.base_note + key: rgb for key, rgb in batch.items()})
 
     def _color(self, rgb):
         return tuple(round(v * self.brightness) for v in rgb)
@@ -140,7 +148,7 @@ class PartyKeys:
         # A full initial clear takes about nine seconds, never one bulk frame.
         if self.initializing and self.now() < self.ready_at:
             self.sleep(self.ready_at - self.now())
-        self._write_changes({key: BLACK for key in range(KEY_COUNT)
+        self._write_changes({key: BLACK for key in (n - self.base_note for n in self.note_range)
                              if self.state.get(key) != BLACK})
         self.initializing = False
 
@@ -152,9 +160,9 @@ class PartyKeys:
             else:
                 self._initialize_tick()
                 return
-        desired = {i: BLACK for i in range(KEY_COUNT)}
+        desired = {note - self.base_note: BLACK for note in self.note_range}
         for note, rgb in notes.items():
-            if self.base_note <= note < self.base_note + KEY_COUNT:
+            if note in self.note_range:
                 desired[note - self.base_note] = self._color(rgb)
         changes = {key: rgb for key, rgb in desired.items() if self.state.get(key) != rgb}
         # Turn stale lights off before illuminating new cues. No queued old
@@ -168,7 +176,7 @@ class PartyKeys:
 
     def invalidate_note(self, note):
         # Physical press/release can change the local LED effect.
-        if self.base_note <= note < self.base_note + KEY_COUNT:
+        if note in self.note_range:
             self.state.pop(note - self.base_note, None)
 
 
@@ -187,6 +195,12 @@ class PalettePartyKeys(PartyKeys):
     """
     MIN_INTERVAL = 0.01  # Explicit fast option; retain 250 ms default for older firmware.
     BATCH_SIZE = 3  # 16-byte maximum; 40 frames passed the v8.3 USB-error test.
+
+    @property
+    def note_range(self):
+        # CMD71 addresses MIDI pitches, unlike RGB15's physical key indices.
+        # Let the keyboard route pitches to its connected boards/octave range.
+        return range(128)
 
     def _color(self, rgb):
         if not any(rgb):
@@ -209,7 +223,7 @@ class PalettePartyKeys(PartyKeys):
         # Match the referenced implementation's executable code (0F01), not
         # its conflicting 0F05 header comment. No full-board clear on connect.
         self._send(mido.Message("sysex", data=(*HEADER, 0x0F, 1)))
-        self.state = {key: BLACK for key in range(KEY_COUNT)}
+        self.state = {note - self.base_note: BLACK for note in self.note_range}
         self.ready_at = self.last_send + 1.0
         self.initializing = True
         if blocking:
