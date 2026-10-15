@@ -24,6 +24,7 @@ if not windows:
     (bundle / exe).chmod(0o755)
     (bundle / launcher).chmod(0o755)
 shutil.copytree(root / "examples", bundle / "examples", dirs_exist_ok=True)
+shutil.copytree(root / "docs" / "images", bundle / "docs" / "images", dirs_exist_ok=True)
 subprocess.run([sys.executable, str(root / "scripts" / "bundle_notices.py"),
                 str(bundle)], check=True)
 archive = root / "dist" / (name + ".zip")

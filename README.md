@@ -59,10 +59,24 @@ Always specify `--input` on Windows; automatic cue discovery currently looks for
 ## Set up Synthesia on macOS
 
 1. Double-click **Start Synthesia bridge.command** in the extracted Mac download. It creates a MIDI destination named **Synthesia Lights** automatically. Leave the terminal open.
-2. In Synthesia's music-device settings, enable **PartyKeys** as a music input.
-3. Enable **Synthesia Lights** as a music output and set **Key Lights → Finger-based channel**.
-4. Turn off ordinary song-note, background, percussion, and metronome output on **Synthesia Lights**. Keep sound enabled through Synthesia's built-in synthesizer or another audio destination.
-5. Disable direct music output to PartyKeys and close any other apps controlling its LEDs, then start a song.
+
+   ![The extracted Mac download with Start Synthesia bridge.command selected](docs/images/mac-launcher.jpg)
+
+2. Open **Synthesia → Settings → Music Devices**. Enable **PartyKeys** under **Music Input** and disable **PartyKeys** under **Music Output**. Keep **Built-in MIDI Synthesizer** enabled for sound, then select **Synthesia Lights** under **Music Output**.
+
+   ![Synthesia Music Devices with PartyKeys input enabled, direct PartyKeys output off, and Synthesia Lights configured for key lights](docs/images/synthesia-music-devices.jpg)
+
+   The screenshot shows the completed setup. Any **IAC Driver** entries are from an older manual setup; you do not need to create them.
+
+3. Enable **Send output to this device**. Turn off **My Notes**, **Background Instruments**, **Percussion**, and **Metronome** on **Synthesia Lights**.
+
+   ![Synthesia Lights output enabled with ordinary note, background, percussion, and metronome output disabled](docs/images/synthesia-lighting-output.jpg)
+
+4. Open **Key Lights**, scroll down, and select **Finger-based channel**.
+
+   ![Finger-based channel selected in Synthesia's Key Lights options](docs/images/synthesia-finger-based-channel.jpg)
+
+5. Close any other apps controlling PartyKeys LEDs, then start a song.
 
 There is no Audio MIDI Setup/IAC configuration or extra driver to install with this method. The MIDI destination exists while the bridge runs and disappears when it exits. Start the bridge before choosing the output in Synthesia. Synthesia's output selection is still a one-time manual step; the launcher does not edit Synthesia's settings. If another bridge already owns that destination, the new instance stops rather than creating a duplicate.
 
