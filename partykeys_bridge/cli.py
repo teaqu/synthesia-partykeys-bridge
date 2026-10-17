@@ -17,6 +17,7 @@ from .connection import BridgeConnection
 from .driver import PartyKeys, select_port, make_driver
 from .preview import AudioPlayback, Preview, Transport
 from .song import Song
+from . import settings
 
 LOG = logging.getLogger("partykeys")
 
@@ -94,16 +95,15 @@ def parser():
             sub.add_argument("--sweep", action="store_true", help="Test all 36 keys, one at a time")
             continue
         sub.add_argument("--left-color", type=color, default=(0, 80, 255))
-        sub.add_argument("--right-color", type=color, default=(0, 80, 255) if mode == "bridge" else (255, 100, 0))
+        sub.add_argument("--right-color", type=color, default=(0, 255, 0) if mode == "bridge" else (255, 100, 0))
         sub.add_argument("--left-channels", type=channels, default=None if mode == "bridge" else {1})
         sub.add_argument("--right-channels", type=channels, default=None if mode == "bridge" else {0})
         if mode == "bridge":
-            sub.add_argument("--input", help="Synthesia IAC bus name or unique substring (auto: IAC)")
+            sub.add_argument("--config", help="JSON settings file (default: config.json beside the executable)")
+            sub.add_argument("--input", help="Cue MIDI input or unique substring; with --virtual-input, name to create")
             sub.add_argument("--virtual-input", action="store_true",
-                             help="macOS: create the cue MIDI destination automatically; --input names it (default: Synthesia Lights)")
-            sub.add_argument("--pressed-input", help="Physical keyboard input for held-key feedback (auto: PartyKeys)")
-            sub.add_argument("--pressed-color", type=color, default=(0, 80, 255))
-            sub.add_argument("--no-press-feedback", action="store_true", help="Disable physical held-key color")
+                             help="Create cue ports automatically on macOS or Windows 11 25H2+ (experimental API); default: Synthesia Lights")
+            sub.add_argument("--keyboard-input", help="Keyboard input for board and octave reports (auto: PartyKeys)")
         else:
             sub.add_argument("file")
             sub.add_argument("--lookahead", type=finite, default=2.0, help="Advance lighting in real seconds, 0..5")
@@ -304,9 +304,8 @@ def execute(args):
     make_driver(None, args)
     bridge = preview = song = None
     if args.command == "bridge":
-        bridge = Bridge(args.left_color, args.right_color, args.left_channels, args.right_channels,
-                        args.pressed_color)
-        BridgeConnection(args, bridge, PrintPort()).run()
+        bridge = Bridge(args.left_color, args.right_color, args.left_channels, args.right_channels)
+        BridgeConnection(args, bridge, PrintPort(), config_watcher=getattr(args, "config_watcher", None)).run()
         return
     elif args.command == "preview":
         if not 0 <= args.latency_ms <= 1000:
@@ -349,6 +348,7 @@ def execute(args):
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
     args = parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if getattr(args, "debug", False) else logging.INFO,
                         format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
@@ -357,6 +357,12 @@ def main(argv=None):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)
     try:
+        if args.command == "bridge":
+            config_path = args.config or settings.default_path()
+            if args.config or config_path.is_file():
+                config = settings.load(config_path, required=True)
+                settings.apply_startup(args, config, argv)
+                args.config_watcher = settings.ConfigWatcher(config_path, config, args, argv)
         execute(args)
         return 0
     except KeyboardInterrupt:

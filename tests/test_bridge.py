@@ -443,51 +443,14 @@ class BridgeTests(ClockedTests):
         bridge.receive(mido.Message("note_on", note=67, channel=0, velocity=0))
         self.assertEqual(bridge.lights(), {})
 
-    def test_cue_off_does_not_clear_physically_held_red(self):
-        bridge = Bridge()
-        bridge.receive(mido.Message("note_on", note=60, channel=9))
-        bridge.receive_pressed(mido.Message("note_on", note=60))
-        bridge.receive(mido.Message("note_off", note=60, channel=0))
-        self.assertEqual(bridge.lights(), {60: (255, 0, 0)})
-        bridge.receive_pressed(mido.Message("note_off", note=60))
-        self.assertEqual(bridge.lights(), {})
 
-    def test_bridge_cli_defaults_all_blue(self):
+    def test_bridge_cli_defaults_left_blue_right_green(self):
         args = parser().parse_args(["bridge"])
         self.assertEqual(args.left_color, (0, 80, 255))
-        self.assertEqual(args.right_color, (0, 80, 255))
-        self.assertEqual(args.pressed_color, (0, 80, 255))
+        self.assertEqual(args.right_color, (0, 255, 0))
 
-    def test_dark_cue_press_release_and_cue_off(self):
-        bridge = Bridge()
-        self.assertEqual(bridge.lights(), {})
-        bridge.receive(mido.Message("note_on", note=60, channel=1))
-        self.assertEqual(bridge.lights()[60], bridge.left)
-        bridge.receive_pressed(mido.Message("note_on", note=60, channel=0))
-        self.assertEqual(bridge.lights()[60], (255, 0, 0))
-        bridge.receive_pressed(mido.Message("note_off", note=60, channel=0))
-        self.assertEqual(bridge.lights()[60], bridge.left)
-        bridge.receive(mido.Message("note_off", note=60, channel=1))
-        self.assertEqual(bridge.lights(), {})
 
-    def test_cue_off_while_held_stays_red_until_release(self):
-        bridge = Bridge()
-        bridge.receive(mido.Message("note_on", note=60))
-        bridge.receive_pressed(mido.Message("note_on", note=60))
-        bridge.receive(mido.Message("note_off", note=60))
-        self.assertEqual(bridge.lights(), {60: (255, 0, 0)})
-        bridge.receive_pressed(mido.Message("note_on", note=60, velocity=0))
-        self.assertEqual(bridge.lights(), {})
 
-    def test_uncued_chord_press_reset_and_duplicate(self):
-        bridge = Bridge()
-        for pitch in (60, 64, 64):
-            bridge.receive_pressed(mido.Message("note_on", note=pitch))
-        self.assertEqual(bridge.lights(), {60: (255, 0, 0), 64: (255, 0, 0)})
-        bridge.receive_pressed(mido.Message("note_off", note=64))
-        self.assertEqual(bridge.lights(), {60: (255, 0, 0)})
-        bridge.receive_pressed(mido.Message("control_change", control=123))
-        self.assertEqual(bridge.lights(), {})
 
     def test_clear_reassertion_after_local_key_effect(self):
         driver = PartyKeys(Port())

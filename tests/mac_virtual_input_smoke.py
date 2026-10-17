@@ -18,7 +18,7 @@ if sys.platform != "darwin":
 name = "PartyKeys setup test " + uuid.uuid4().hex[:12]
 command = [str(Path(sys.argv[1]).resolve())] if len(sys.argv) > 1 else [sys.executable, "-m", "partykeys_bridge"]
 command += ["bridge", "--virtual-input", "--input", name, "--dry-run",
-            "--no-press-feedback", "--palette-interval-ms", "10"]
+            "--palette-interval-ms", "10"]
 
 def wait_for(predicate, label, timeout=8):
     end = time.monotonic() + timeout

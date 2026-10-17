@@ -1,0 +1,61 @@
+This experimental build uses Microsoft Windows MIDI Services Preview 11
+(Windows.Devices.Midi2 0.99.92-preview.11). Windows 11 25H2 or newer is required
+for automatic native MIDI port creation. No separate loopMIDI installation or
+.NET installation is needed with this download.
+
+Extract the whole ZIP, then open Start Synthesia bridge.cmd.
+Left-hand cues are blue; right-hand cues are green. Edit config.json to change
+palette names and hand colours. Colours reload live while the bridge runs;
+MIDI connection options require a restart. RGB brightness is a separate setting
+for the slower RGB protocol. This build does not read
+unsaved custom colours from Synthesia's memory or alter its settings.
+Keep the native-midi-helper folder beside partykeys.exe.
+In Synthesia, select Synthesia Lights under Music Output, enable sending to it,
+disable ordinary notes/background/percussion/metronome on that output, and
+select Key Lights > Finger-based channel. Use PartyKeys for Music Input and
+keep the built-in synthesizer enabled for sound. Disable music output to PartyKeys.
+
+Synthesia shows just one output: Synthesia Lights. An internal receiver is
+hidden from MIDI 1.0 apps; the helper reads it through the native API. Stop the bridge
+with Ctrl+C to clear its lights and remove its ports. If a process is forcibly
+killed and its ports remain, remove that pair using Microsoft's MIDI Settings
+before launching another instance. A Windows MIDI service restart also removes
+temporary ports.
+
+Fallback for Windows 10 or unsupported configurations: install loopMIDI, create
+a port named Synthesia Lights, leave it running, then use the launcher again.
+The launcher reuses that existing single-port route without starting the helper.
+For custom existing ports, use:
+partykeys.exe bridge --input "YOUR PORT" --palette-interval-ms 10
+
+Verified on the development PC: one visible output, private delivery of note-on/off, CC resets
+and Stop messages into the bridge, generated LED messages with physical output
+disabled, repeated starts, and removal of temporary ports. Live Synthesia hand lights, joined-board routing and reset cleanup were also
+tested on the development PC. PartyKeys firmware v9 remains required for real keyboard output.
+
+Microsoft API: https://github.com/microsoft/MIDI/releases/tag/inbox-preview-11
+Source and license: https://github.com/microsoft/MIDI (MIT)
+The native API may change in future Windows releases. Replace this experimental
+build with an updated version when the API is delivered in Windows.
+
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

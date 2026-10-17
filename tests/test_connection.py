@@ -31,6 +31,9 @@ class Device:
 
 class ConnectionTests(unittest.TestCase):
     def setUp(self):
+        discovery = patch("partykeys_bridge.routing.discover_boards", return_value=([(1, 0x3f, 48)], {1: 0}))
+        discovery.start()
+        self.addCleanup(discovery.stop)
         self.inputs = ["IAC Lights", "PartyKeys"]
         self.outputs = ["PartyKeys"]
         self.now = [0]
@@ -58,6 +61,35 @@ class ConnectionTests(unittest.TestCase):
             self.now[0] += 0.25
             self.session.tick()
 
+    def test_joined_board_remove_and_add_keeps_cue_stream_running(self):
+        from partykeys_bridge.routing import BoardWatcher
+        self.session.args.protocol='palette71'
+        self.session.args.board=[(1,0x3f,48),(1,0x40,84)]
+        self.session.args.palette_interval_ms=10
+        self.step()
+        self.session.topology=BoardWatcher(self.session.args.board,now=lambda:self.now[0])
+        def report(address,command,value=0):
+            return mido.Message('sysex',data=(5,0x30,0x7e,0x7e,1,address,command,value,9))
+        source=self.session.ports['pressed']
+        self.session.ports['cue'].pending.append(mido.Message('note_on',channel=1,note=60))
+        source.pending.extend([report(0x40,5),mido.Message('note_on',note=60)])
+        self.session.tick()
+        self.assertTrue(self.session.topology.suspended)
+        self.assertIn(60,self.session.bridge.lights())
+        self.now[0]+=.71;self.session.tick()
+        source.pending.append(report(0x3f,2,1))
+        self.now[0]+=3.01;self.session.tick()
+        self.assertEqual(self.session.args.board,[(1,0x3f,48)])
+        self.assertNotIn(96,self.session.driver.routes)
+        self.assertIn(60,self.session.bridge.lights())
+        source.pending.append(report(0x40,4));self.session.tick()
+        self.now[0]+=.71;self.session.tick()
+        source.pending.extend([report(0x3f,2,1),report(0x40,2)])
+        self.now[0]+=3.01;self.session.tick()
+        self.assertIn(96,self.session.driver.routes)
+        self.step()
+        self.assertEqual(self.session.driver.state[60-self.session.driver.base_note],self.session.bridge.left)
+
     def test_transient_enumeration_race_keeps_live_handles(self):
         self.step()
         original = self.session.ports.copy()
@@ -83,14 +115,13 @@ class ConnectionTests(unittest.TestCase):
         cue.pending.append(mido.Message("note_on", note=60))
         self.session.ports["pressed"].pending.append(mido.Message("note_on", note=60))
         self.step()
-        self.assertEqual(self.session.driver.state[12], (255, 0, 0))
+        self.assertEqual(self.session.driver.state[12], self.session.bridge.right)
         self.inputs.remove("PartyKeys")
         self.outputs.clear()
         self.step()
         self.assertIsNone(self.session.driver)
         cue.pending.extend([mido.Message("note_off", note=60), mido.Message("note_on", note=64)])
         self.step()
-        self.assertEqual(self.session.bridge.pressed, set())
         self.inputs.append("PartyKeys")
         self.outputs.append("PartyKeys")
         self.step()
@@ -159,7 +190,6 @@ class ConnectionTests(unittest.TestCase):
         pressed.pending.append(message)
         self.step()
         self.assertEqual(self.session.driver.octaves, {1: -1})
-        self.assertFalse(self.session.bridge.pressed)
         self.assertIn(80, self.session.bridge.lights())
         self.assertEqual(self.session.driver.routes[80], (1, 0x40))
         self.session.drop("output")
@@ -189,6 +219,9 @@ class ConnectionTests(unittest.TestCase):
         self.now[0] += .1
         session.tick()
         self.assertIn(60, session.bridge.lights())
+        for _ in range(15):
+            self.now[0] += .02
+            session.tick()
         self.assertEqual(session.driver.state[12], session.bridge.left)
         self.outputs.remove("PartyKeys")
         self.now[0] += 2
@@ -215,10 +248,46 @@ class ConnectionTests(unittest.TestCase):
         self.assertIsNotNone(session.ports["cue"])
         self.assertIsNone(session.ports["output"])
 
-    def test_virtual_option_rejected_on_windows_before_enumeration(self):
+    def test_virtual_option_rejected_on_unsupported_platform_before_enumeration(self):
         args = parser().parse_args(["bridge", "--virtual-input"])
-        with patch("partykeys_bridge.connection.sys.platform", "win32"), \
+        with patch("partykeys_bridge.connection.sys.platform", "linux"), \
                 patch("mido.get_input_names") as inputs:
             with self.assertRaisesRegex(ValueError, "macOS"):
                 BridgeConnection(args, Bridge())
             inputs.assert_not_called()
+
+    def test_windows_native_device_reads_private_connection_without_rtmidi(self):
+        args = parser().parse_args(["bridge", "--virtual-input",
+                                    "--output", "PartyKeys", "--palette-interval-ms", "10"])
+        from partykeys_bridge.windows_midi import CueRoute
+        self.outputs += ["Synthesia Lights 4"]
+        with patch("partykeys_bridge.connection.sys.platform", "win32"), \
+                patch("partykeys_bridge.connection.existing_route", return_value=None), \
+                patch("partykeys_bridge.connection.WindowsVirtualInput") as native:
+            native.return_value.start.return_value = CueRoute("Synthesia Lights", "Synthesia Lights 4")
+            native.return_value.iter_pending.return_value = []
+            session = BridgeConnection(args, Bridge(), now=lambda: self.now[0])
+            try:
+                session.tick()
+                self.assertIs(session.ports["cue"], native.return_value)
+                native.return_value.iter_pending.return_value = [mido.Message("note_on", channel=1, note=60)]
+                session.tick()
+                self.assertIn(60, session.bridge.lights())
+                self.assertEqual(session.ports["output"].name, "PartyKeys")
+                session.refresh()
+                native.return_value.start.assert_called_once()
+            finally:
+                session.close()
+            self.assertTrue(native.return_value.close.called)
+
+    def test_windows_reuses_existing_loopmidi_without_starting_helper(self):
+        from partykeys_bridge.windows_midi import CueRoute
+        args = parser().parse_args(["bridge", "--virtual-input"])
+        self.inputs += ["Synthesia Lights 2"]
+        with patch("partykeys_bridge.connection.sys.platform", "win32"), \
+                patch("partykeys_bridge.connection.existing_route", return_value=CueRoute("Synthesia Lights 2", "Synthesia Lights 3")), \
+                patch("partykeys_bridge.connection.WindowsVirtualInput") as native:
+            session = BridgeConnection(args, Bridge(), now=lambda: self.now[0])
+            session.tick()
+            session.close()
+            native.assert_not_called()

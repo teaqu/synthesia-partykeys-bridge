@@ -7,6 +7,7 @@ import mido
 import rtmidi
 
 from .driver import MidiInput, PalettePartyKeys, make_driver, octave_report, select_port
+from .windows_midi import WindowsVirtualInput, existing_route
 
 LOG = logging.getLogger("partykeys")
 # InvalidPortError inherits ValueError, not RuntimeError/OSError. Catch the
@@ -15,10 +16,14 @@ IO_ERRORS = (OSError, RuntimeError, rtmidi.RtMidiError)
 
 
 class BridgeConnection:
-    def __init__(self, args, bridge, print_port=None, now=time.monotonic):
+    def __init__(self, args, bridge, print_port=None, now=time.monotonic, config_watcher=None):
+        self.config_watcher = config_watcher
         self.virtual_input = getattr(args, "virtual_input", False)
-        if self.virtual_input and sys.platform != "darwin":
-            raise ValueError("--virtual-input is supported on macOS; use a loopMIDI bus on Windows")
+        if self.virtual_input and sys.platform not in ("darwin", "win32"):
+            raise ValueError("--virtual-input is supported on macOS and Windows")
+        self.windows_virtual = self.virtual_input and sys.platform == "win32"
+        self.windows_device = None
+        self.windows_route = None
         self.cue_name = args.input or "Synthesia Lights"
         if self.virtual_input and not self.cue_name.strip():
             raise ValueError("Virtual MIDI destination name cannot be empty")
@@ -27,7 +32,11 @@ class BridgeConnection:
         self.names = {}
         self.status = {}
         self.driver = None
+        self.topology = None
+        self.auto_board_routes = (getattr(args, "protocol", "rgb15") == "palette71"
+                                  and not getattr(args, "board", ()) and not args.dry_run)
         self.next_scan = 0
+        self.clear_generation = self.bridge.clear_generation
         self.print_port = print_port
         self.keyboard_octaves = {}
 
@@ -45,11 +54,13 @@ class BridgeConnection:
         port, self.ports[kind] = self.ports[kind], None
         if kind == "output":
             self.driver = None
+            self.topology = None
         elif kind == "cue":
             self.bridge.active.clear()
             self.bridge.counts.clear()
         elif kind == "pressed":
-            self.bridge.pressed.clear()
+            if self.auto_board_routes and self.ports["output"]:
+                self.drop("output")
         if port:
             try:
                 if hasattr(port, "close"):
@@ -69,6 +80,19 @@ class BridgeConnection:
             return None
 
     def refresh(self):
+        if self.windows_virtual:
+            if self.windows_route is None:
+                self.windows_route = existing_route(self.cue_name)
+                if self.windows_route is None:
+                    self.windows_device = WindowsVirtualInput(self.cue_name)
+                    self.windows_route = self.windows_device.start()
+                    self.ports["cue"] = self.windows_device
+                    self.names["cue"] = self.cue_name
+                self.args.input = self.windows_route.input
+                LOG.info("In Synthesia, select Music Output -> %s -> Key Lights -> Finger-based channel. "
+                         "Keep this bridge running.", self.windows_route.synthesia_output)
+            if self.windows_device:
+                self.windows_device.check()
         try:
             inputs, outputs = mido.get_input_names(), mido.get_output_names()
         except IO_ERRORS as error:
@@ -78,13 +102,13 @@ class BridgeConnection:
             return
         self.status.pop("scan", None)
         self.report("inventory", f"MIDI inputs: {inputs}; outputs: {outputs}")
-        specs = [("cue", inputs, self.args.input, "iac")]
-        if not self.args.no_press_feedback:
-            specs.append(("pressed", inputs, self.args.pressed_input, "partykeys"))
+        specs = [] if self.windows_device else [("cue", inputs, self.args.input, "iac")]
+        if not self.args.dry_run:
+            specs.append(("pressed", inputs, self.args.keyboard_input, "partykeys"))
         if not self.args.dry_run:
             specs.append(("output", outputs, self.args.output, "partykeys"))
         for kind, available, requested, hint in specs:
-            virtual = kind == "cue" and self.virtual_input
+            virtual = kind == "cue" and self.virtual_input and not self.windows_virtual
             if virtual:
                 if self.ports[kind]:
                     continue  # A virtual destination isn't an enumerated MIDI source.
@@ -94,6 +118,9 @@ class BridgeConnection:
             else:
                 if kind != "cue":
                     available = [name for name in available if name != self.names.get("cue")]
+                    if self.windows_route:
+                        available = [name for name in available
+                                     if name not in (self.windows_route.input, self.windows_route.synthesia_output)]
             port = self.ports[kind]
             if not virtual and port and self.names[kind] not in available:
                 self.report(kind, f"{kind} port absent: {self.names[kind]}; waiting to reconnect.", True)
@@ -115,9 +142,20 @@ class BridgeConnection:
                     self.ports[kind] = mido.open_output(name) if kind == "output" else MidiInput(name)
                 self.names[kind] = name
                 if kind == "output":
+                    if self.auto_board_routes:
+                        from .routing import discover_boards
+                        if not self.ports["pressed"]:
+                            raise OSError("Board discovery is waiting for the PartyKeys physical input")
+                        self.args.board, octaves = discover_boards(self.ports["pressed"], self.ports[kind])
+                        self.keyboard_octaves.update(octaves)
                     self.driver = make_driver(self.ports[kind], self.args)
                     self.restore_octaves()
                     self.driver.initialize(blocking=False)  # Clear gradually while inputs keep draining.
+                    if isinstance(self.driver, PalettePartyKeys):
+                        self.driver.request_full_clear()
+                    if self.auto_board_routes:
+                        from .routing import BoardWatcher
+                        self.topology = BoardWatcher(self.args.board, self.keyboard_octaves, now=self.now)
                 self.report(kind, f"Connected {kind}: {name}")
                 if virtual:
                     LOG.info("In Synthesia, select Music Output → %s → Key Lights → Finger-based channel. Keep this bridge running.", name)
@@ -131,6 +169,8 @@ class BridgeConnection:
             self.driver.initialize(blocking=False)
 
     def tick(self):
+        if self.config_watcher:
+            self.config_watcher.apply(self)
         if self.now() >= self.next_scan:
             self.next_scan = self.now() + 1
             self.refresh()
@@ -143,6 +183,8 @@ class BridgeConnection:
                     if kind == "cue":
                         self.bridge.receive(message)
                     else:
+                        if self.topology:
+                            self.topology.receive(message)
                         report = octave_report(message)
                         configured = getattr(self.args, "board", ())
                         if report is not None and any(
@@ -151,11 +193,7 @@ class BridgeConnection:
                             channel, octave = report
                             self.keyboard_octaves[channel] = octave
                             if isinstance(self.driver, PalettePartyKeys):
-                                if self.driver.set_octave(channel, octave):
-                                    # Held notes can be released under new pitches after
-                                    # a shift. Do not leave the old pitches stuck blue.
-                                    self.bridge.pressed.clear()
-                        self.bridge.receive_pressed(message)
+                                self.driver.set_octave(channel, octave)
                         if self.driver and message.type in ("note_on", "note_off"):
                             self.driver.invalidate_note(message.note)
             except IO_ERRORS as error:
@@ -163,12 +201,33 @@ class BridgeConnection:
                 self.report(kind, f"{kind} receive failed: {error}; retrying.", True)
         if self.driver:
             try:
+                if self.bridge.clear_generation != self.clear_generation:
+                    self.clear_generation = self.bridge.clear_generation
+                    if isinstance(self.driver, PalettePartyKeys):
+                        self.driver.request_full_clear()
+                if self.topology:
+                    update = self.topology.tick(self.driver)
+                    if update:
+                        boards, octaves, reinitialize = update
+                        try:
+                            self.driver.replace_boards(boards, octaves, reinitialize)
+                        except ValueError as error:
+                            self.topology.request()
+                            self.report("topology", f"Invalid keyboard topology; LED writes suspended: {error}", True)
+                            return
+                        self.args.board = boards
+                        self.keyboard_octaves.update(octaves)
+                        self.report("topology", f"Keyboard routes updated: {boards}")
+                    if self.topology.suspended:
+                        return
                 self.driver.show(self.bridge.lights())
             except IO_ERRORS as error:
                 self.drop("output")
                 self.report("output", f"LED send failed: {error}; retrying.", True)
 
     def close(self):
+        if self.config_watcher:
+            self.config_watcher.close()
         try:
             if self.driver:
                 try:
@@ -177,12 +236,18 @@ class BridgeConnection:
                 except IO_ERRORS as error:
                     LOG.warning("LED cleanup unavailable: %s", error)
         finally:
-            for kind in ("output", "pressed", "cue"):
-                self.drop(kind)
+            try:
+                for kind in ("output", "pressed", "cue"):
+                    self.drop(kind)
+            finally:
+                if self.windows_device:
+                    self.windows_device.close()
 
     def run(self):
         print("Bridge running with automatic reconnection. Ctrl+C clears lights and exits.")
         try:
+            if self.config_watcher:
+                self.config_watcher.start()
             while True:
                 self.tick()
                 time.sleep(0.01)

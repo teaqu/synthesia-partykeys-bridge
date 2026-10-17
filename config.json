@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "live_reload": true,
+  "poll_interval_ms": 500,
+  "palette": {
+    "blue": "0050FF",
+    "green": "00FF00",
+    "red": "FF0000",
+    "orange": "FF6400",
+    "yellow": "FFFF00",
+    "purple": "B400FF",
+    "cyan": "00FFB4"
+  },
+  "lighting": {
+    "left_color": "blue",
+    "right_color": "green",
+    "rgb_brightness": 1.0
+  },
+  "midi": {
+    "create_virtual_input": true,
+    "input": "Synthesia Lights",
+    "palette_interval_ms": 10
+  }
+}

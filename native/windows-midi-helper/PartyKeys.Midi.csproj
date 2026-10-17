@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <WindowsSDKPackageVersion>10.0.26100.57</WindowsSDKPackageVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <CSWinRTInputs>Windows.Devices.Midi2</CSWinRTInputs>
+    <CsWinRTIncludes>Windows.Devices.Midi2</CsWinRTIncludes>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.2.0" />
+    <PackageReference Include="Windows.Devices.Midi2" Version="0.99.92-preview.11" />
+  </ItemGroup>
+</Project>

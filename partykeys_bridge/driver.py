@@ -73,7 +73,7 @@ class MidiInput:
             self.rt.delete()
 
 
-def rgb_messages(colors):
+def rgb_messages(colors, channel=0x7f, address=0x7f):
     """One key per RGB frame: the format verified on this keyboard."""
     for key, rgb in sorted(colors.items()):
         if not isinstance(key, int) or not 0 <= key < KEY_COUNT:
@@ -81,7 +81,7 @@ def rgb_messages(colors):
         if len(rgb) != 3 or any(not isinstance(v, int) or not 0 <= v <= 255 for v in rgb):
             raise ValueError("RGB requires three integers in 0..255")
         encoded = tuple(part for value in rgb for part in divmod(value, 128))
-        yield mido.Message("sysex", data=(*HEADER, 0x15, 1, *encoded, 1, key))
+        yield mido.Message("sysex", data=(5, 0x30, channel, address, 0x20, 0, 0x15, 1, *encoded, 1, key))
 
 
 class PartyKeys:
@@ -181,12 +181,18 @@ class PartyKeys:
         changes = {key: rgb for key, rgb in desired.items() if self.state.get(key) != rgb}
         # Turn stale lights off before illuminating new cues. No queued old
         # chord can survive a new desired state on the following tick.
-        ordered = sorted(changes, key=lambda key: (changes[key] != BLACK, key))
+        ordered = sorted(changes, key=lambda key: (self._priority(changes[key]), key))
         if not force:
             if self.now() < self.last_send + self.min_interval:
                 return
-            ordered = ordered[:self.BATCH_SIZE]
+            ordered = self._batch_keys(ordered, changes)
         self._write_changes({key: changes[key] for key in ordered})
+
+    def _priority(self, color):
+        return 0 if color == BLACK else 1
+
+    def _batch_keys(self, ordered, changes):
+        return ordered[:self.BATCH_SIZE]
 
     def invalidate_note(self, note):
         # Physical press/release can change the local LED effect.
@@ -231,6 +237,77 @@ class PalettePartyKeys(PartyKeys):
                 self.routes[note] = destination
             LOG.info("Board channel %d address %#x: MIDI %d–%d", channel, address, lowest, lowest + 35)
         self.routes = self._shifted_routes(self.octaves)
+        self.pending_modes = []
+        self.full_clear = None
+
+    def replace_boards(self, boards, octaves=None, reinitialize=False):
+        """Validate new maps before swapping; never send using removed routes."""
+        candidate = PalettePartyKeys(self.port, self.brightness, self.base_note,
+                                     min_interval=self.min_interval, now=self.now, sleep=self.sleep,
+                                     boards=boards)
+        for channel, octave in (self.octaves if octaves is None else octaves).items():
+            if channel in candidate.octaves:
+                candidate.set_octave(channel, octave)
+        # Keep only stable known-dark physical keys. Reassert lit targets and
+        # explicitly clear unknown keys on newly attached/reinitialized boards.
+        old_destinations = {(ch,addr) for ch,addr,_ in self.boards}
+        destinations = {(ch,addr) for ch,addr,_ in candidate.boards}
+        self.pending_modes = sorted(destinations if reinitialize else destinations - old_destinations)
+        self.state = {key: value for key,value in self.state.items()
+                      if value == BLACK and self.base_note + key in candidate.routes
+                      and candidate.routes[self.base_note + key] not in self.pending_modes
+                      and candidate.routes[self.base_note + key] == self.routes.get(self.base_note + key)
+                      and candidate.octaves.get(candidate.routes[self.base_note + key][0])
+                          == self.octaves.get(candidate.routes[self.base_note + key][0])}
+        self.boards, self.routes, self.octaves = candidate.boards, candidate.routes, candidate.octaves
+        self.full_clear = [note - self.base_note for note in self.note_range]
+
+    def request_full_clear(self):
+        if self.full_clear is None:
+            self.full_clear = [note - self.base_note for note in self.note_range]
+            LOG.info("Clearing every mapped key before restoring current lights (%d keys)", len(self.full_clear))
+
+    def _clear_batch(self):
+        keys = self._batch_keys(self.full_clear, {key:BLACK for key in self.full_clear})
+        self._write_changes({key:BLACK for key in keys})
+        done = {key for key in keys if self.state.get(key) == BLACK}
+        self.full_clear = [key for key in self.full_clear if key not in done]
+        if not self.full_clear:
+            self.full_clear = None
+            LOG.info("Full mapped-key clear complete")
+
+    def clear(self):
+        if self.initializing and self.now() < self.ready_at:
+            self.sleep(self.ready_at - self.now())
+        while self.full_clear is not None:
+            self._clear_batch()
+        super().clear()
+
+    def show(self, notes, force=False):
+        if self.pending_modes:
+            if self.now() < self.last_send + self.min_interval:
+                return
+            channel, address = self.pending_modes.pop(0)
+            self._send(mido.Message("sysex", data=(5,0x30,channel,address,0x20,0,0x0f,1)))
+            self.initializing, self.ready_at = True, self.last_send + 1.0
+            return
+        if self.full_clear is not None:
+            if self.initializing:
+                self._initialize_tick()
+                if not force:
+                    return
+                if self.now() < self.ready_at:
+                    self.sleep(self.ready_at - self.now())
+                self.initializing = False
+            if not force and self.now() < self.last_send + self.min_interval:
+                return
+            if force:
+                while self.full_clear is not None:
+                    self._clear_batch()
+            else:
+                self._clear_batch()
+            return
+        super().show(notes, force)
 
     def _shifted_routes(self, octaves):
         routes = {}
