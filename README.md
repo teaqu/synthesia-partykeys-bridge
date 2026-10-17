@@ -1,5 +1,7 @@
 # Synthesia → PartyKeys bridge
 
+![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
+
 Light PartyKeys keyboards, including multiple boards joined together, from Synthesia on macOS or Windows using a virtual MIDI cable. Left-hand cues light blue and right-hand cues light green; keys return to dark when neither is active, including notes you miss.
 
 ## Download and start
