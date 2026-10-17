@@ -113,13 +113,13 @@ Start the bridge before Synthesia. After restarting the bridge, restart Synthesi
 For older Windows versions, or when using loopMIDI instead of the native MIDI API:
 
 1. Install and open [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html).
-2. On **Setup**, enter **Synthesia loopMIDI** in **New port-name**, then click **+** at the bottom left. The new port appears in the list, as shown below.
-3. In `config.json`, set `midi.create_virtual_input` to `false` and `midi.input` to `Synthesia loopMIDI`. Leave loopMIDI running, then start **Start Synthesia bridge.cmd**.
-4. In Synthesia, select **Synthesia loopMIDI** under **Music Output**, enable sending, leave ordinary notes off, and choose **Key Lights → Finger-based channel**. Use the same options shown in the Windows screenshots above, but select the loopMIDI port name. Keep **PartyKeys** as Music Input and its Music Output off.
+2. On **Setup**, enter **Synthesia Lights** in **New port-name**, then click **+** at the bottom left. The new port appears in the list, as shown below.
+3. Leave loopMIDI running, then start **Start Synthesia bridge.cmd**. Keep `midi.input` in `config.json` set to `Synthesia Lights`; the bridge reuses that port without starting its native MIDI helper. You can also set `midi.create_virtual_input` to `false` to explicitly use the existing port.
+4. In Synthesia, select **Synthesia Lights** under **Music Output**, enable sending, leave ordinary notes off, and choose **Key Lights → Finger-based channel**, as shown in the Windows screenshots above. Keep **PartyKeys** as Music Input and its Music Output off.
 
-![loopMIDI with the created Synthesia loopMIDI port and MIDI data received](docs/images/windows-loopmidi-port-created.png)
+![loopMIDI with the created Synthesia Lights port, received MIDI data and active throughput](docs/images/windows-loopmidi-port-created.png)
 
-The screenshot shows the port after clicking **+**, with data already received. **Total data** increases when messages pass through the port; **Throughput / sec.** can return to `0 Byte` between messages. Open loopMIDI before the bridge and Synthesia on later runs too. This example uses a different name from the native **Synthesia Lights** route so the two connections are easy to distinguish.
+The screenshot shows the port after clicking **+**, with MIDI traffic passing through it. **Total data** increases as messages arrive; **Throughput / sec.** can return to `0 Byte` between messages. Open loopMIDI before the bridge and Synthesia on later runs too. Use either loopMIDI or the native bridge for this name; stop the native bridge before creating the loopMIDI port to avoid duplicate names.
 
 Custom existing routes also work:
 
