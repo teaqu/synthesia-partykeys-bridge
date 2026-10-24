@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 import queue
 import threading
+import tempfile
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox
 
@@ -40,7 +41,7 @@ def save_config(path, practice, hand_colors, trail=None):
 
 
 class Window:
-    def __init__(self, root, args):
+    def __init__(self, root, args, auto_start=True):
         self.root, self.args = root, args
         self.path = Path(args.config or settings.default_path())
         config = settings.load(self.path)
@@ -145,7 +146,8 @@ class Window:
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
         # Hardware is only opened by the bridge owned by this window.
-        root.after(200, self.start_bridge)
+        if auto_start:
+            root.after(200, self.start_bridge)
 
     def draw_keyboard(self):
         white = 0
@@ -326,6 +328,8 @@ class Window:
 
 
 def run(args):
+    if getattr(args, "smoke_test", False):
+        return smoke_test(args)
     root = tk.Tk()
     window = Window(root, args)
     try:
@@ -339,3 +343,73 @@ def run(args):
             root.destroy()
         except tk.TclError:
             pass
+
+
+def smoke_test(args):
+    """Launch the real frozen window on CI without touching MIDI or user settings."""
+    failures = []
+    with tempfile.TemporaryDirectory(prefix="partykeys-gui-") as folder:
+        args = copy(args)
+        args.config = str(Path(folder) / "config.json")
+        Path(args.config).write_text(json.dumps(settings.DEFAULTS), encoding="utf-8")
+        root = tk.Tk()
+        window = Window(root, args, auto_start=False)
+
+        def fail(error):
+            failures.append(str(error))
+            root.destroy()
+
+        root.report_callback_exception = lambda kind, error, tb: fail(error)
+
+        def check_capture_and_close():
+            try:
+                assert 67 in window.selected, "Keyboard-paint event was not handled"
+                assert window.note_colors[67] == "FF0000", "Keyboard-paint colour was not retained"
+                window.paint_mode.set("erase")
+                window.paint_note(60)
+                assert 60 not in window.selected, "Erase did not remove the key"
+                window.trail_enabled.set(True)
+                window.trail_brightness.set(25)
+                window.trail_seconds.set("12")
+                window.changed()
+                assert window.trail_percent.get() == "25%", "Trail brightness control did not update"
+                assert window.save(), "GUI settings did not save"
+                saved = settings.load(args.config, required=True)
+                assert saved["practice"]["note_colors"]["64"] == "FF0000"
+                assert saved["trail"] == dict(enabled=True, duration_seconds=12., max_brightness=.25)
+                assert window.worker is None, "GUI smoke test opened a MIDI worker"
+                window.close()
+            except Exception as error:
+                fail(error)
+
+        def exercise():
+            try:
+                assert root.winfo_viewable(), "GUI window did not become visible"
+                assert window.canvas.winfo_width() > 100, "Keyboard canvas was not laid out"
+                assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
+                window.set_brush("0050FF")
+                window.paint_note(60)
+                window.set_brush("FF0000")
+                window.paint_note(64)
+                assert window.note_colors[60] == "0050FF", "Changing brush recoloured an existing key"
+                window.capture_enabled.set(True)
+                window.set_capture()
+                window.key_events.put(67)
+                root.after(100, check_capture_and_close)
+            except Exception as error:
+                fail(error)
+
+        root.after(150, exercise)
+        root.after(10000, lambda: fail("GUI smoke test did not close within 10 seconds"))
+        try:
+            root.mainloop()
+        finally:
+            window.stop.set()
+            logging.getLogger("partykeys").removeHandler(window.log_handler)
+            try:
+                root.destroy()
+            except tk.TclError:
+                pass
+        if failures:
+            raise RuntimeError("GUI smoke test failed: " + "; ".join(failures))
+        print("PASS: GUI launched, controls painted/erased keys, keyboard capture and trail settings saved, window closed; no MIDI opened", flush=True)

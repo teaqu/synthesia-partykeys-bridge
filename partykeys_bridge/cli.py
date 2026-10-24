@@ -88,6 +88,8 @@ def parser():
                          help="Current board octave on startup; live hardware reports update it automatically")
         sub.add_argument("--debug", action="store_true")
         sub.add_argument("--dry-run", action="store_true", help="Print LED SysEx; do not open hardware outputs")
+        if mode == "gui":
+            sub.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
         if mode == "test":
             sub.add_argument("--note", type=int, default=60)
             sub.add_argument("--color", type=color, default=(0, 80, 255))

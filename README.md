@@ -27,7 +27,7 @@ The GUI gives you:
 - Trail mode with immediate fading, adjustable duration and a separate maximum brightness.
 - Start/stop controls and live settings changes, with 1 ms LED pacing by default.
 
-For terminal workflows, **Start Synthesia bridge.cmd/.command** and `partykeys bridge` remain available. From a source install, use `partykeys gui` or `python -m partykeys_bridge gui` to open the window.
+The console launcher remains available for terminal use.
 
 ## Downloads
 
@@ -85,31 +85,14 @@ selection. Closing the window stops its bridge, clears LEDs and releases ports.
 The **Left hand…** and **Right hand…** buttons change Synthesia cue colours
 (the fast palette protocol uses the closest supported hue).
 
-Dim practice lights use per-key RGB15 commands alongside the existing fast
-palette cues. RGB and palette writes default to 1 ms pacing. Live GUI changes
-and keyboard painting go straight to the MIDI worker rather than waiting for
-configuration-file reload. Unchanged practice lights send no extra traffic.
-Joined-board RGB addressing and mixed RGB/palette operation require checking on
-your keyboard firmware; automated tests verify message layout, routing and pacing.
-
-The UI uses Python's cross-platform Tk toolkit without browser or web-server
-dependencies. Windows and macOS packages bundle it with the executable. For source
-installs, use Python with Tk support (`python -m tkinter` to check; Linux commonly
-needs `python3-tk`). Linux uses an existing MIDI input, for example
-`partykeys gui --input "Your MIDI bus"`; automatic virtual inputs are available on
-macOS and supported Windows installations. CI builds Windows x64, macOS Intel and
-Apple Silicon; native macOS testing is still required for a new UI build.
-
 ## Requirements
 
 - One or more PartyKeys 36 boards with **firmware v9**.
 - macOS or 64-bit Windows and a USB data connection to the keyboard. Synthesia is only needed for song cues; standalone practice lighting works without it.
-- Python 3.10 or newer for source installs. The executable downloads include Python.
 - A virtual MIDI connection: created automatically by the Mac launcher or the experimental Windows 11 25H2+ launcher. Older Windows configurations can use loopMIDI.
 
 Use [PartyKeys Hub](https://apps.apple.com/app/id6797699163) to update your keyboard. The update requires the keyboard to connect to Wi-Fi. Check the **keyboard firmware version**, which is separate from the Hub app version.
 
-The GUI has been checked on Windows. Earlier console bridge builds were tested on macOS; the new macOS GUI still needs native validation.
 
 This is an independent community project, not an official Synthesia or PartyKeys integration.
 
@@ -139,27 +122,12 @@ Extract the ZIP before running it, then open **Practice lights**. Current builds
 
 There is no Audio MIDI Setup/IAC configuration or extra driver to install with this method. The MIDI destination exists while the bridge runs and disappears when it exits. Start the bridge before choosing the output in Synthesia. Synthesia's output selection is still a one-time manual step; the launcher does not edit Synthesia's settings. If another bridge already owns that destination, the new instance stops rather than creating a duplicate.
 
-For custom settings, open Terminal in the extracted folder and run:
 
-```sh
-./partykeys bridge \
-  --virtual-input --input "Synthesia Lights" \
-  --output "PartyKeys" \
-  --keyboard-input "PartyKeys" \
-  --palette-interval-ms 10
-```
-
-Start a song in Synthesia. Close the GUI window to clear the lights and exit. When using the console alternative, press **Ctrl+C** in its terminal.
-
-Port names can be exact names or unambiguous substrings. Use `./partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
-
-With `--virtual-input`, `--input` is the exact name to create, defaulting to **Synthesia Lights**. On macOS this creates a temporary CoreMIDI destination. On Windows 11 25H2+ it uses the bundled experimental native MIDI API helper to create a temporary loopback pair. Existing IAC setups still work: omit `--virtual-input` and use `--input "IAC Driver Synthesia Lights"`. To set up IAC manually, open **Audio MIDI Setup → Window → Show MIDI Studio → IAC Driver**, enable **Device is online**, and add a **Synthesia Lights** bus.
-
-For source installs, use `partykeys` instead of `./partykeys`. Elsewhere in this guide, replace `partykeys` with `./partykeys` for the Mac executable or `.\partykeys.exe` in Windows PowerShell.
+Close the app window when you finish to clear the lights and stop the bridge.
 
 ## Set up on Windows
 
-This experimental Windows build bundles Microsoft Windows MIDI Services Preview 11. Automatic setup requires **Windows 11 25H2 or newer** and a working Windows MIDI service. It does not install drivers or edit the system MIDI configuration. No separate .NET or loopMIDI installation is needed on supported systems.
+On **Windows 11 25H2 or newer**, the app creates the Synthesia connection automatically. For older Windows versions, use the [loopMIDI setup below](#using-loopmidi-instead).
 
 1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside `partykeys.exe`. Double-click **Practice lights.cmd** and keep the window open. **Start Synthesia bridge.cmd** is the console-only alternative.
 2. Open Synthesia → Settings → Music Devices. Use **PartyKeys** for Music Input and disable PartyKeys under Music Output. Keep the built-in synthesizer enabled for sound.
@@ -178,9 +146,8 @@ This experimental Windows build bundles Microsoft Windows MIDI Services Preview 
 
 ![Windows finger-based channel selected for Synthesia Lights](docs/images/windows-finger-based-channel.png)
 
-Synthesia shows just **Synthesia Lights** under Music Output. The helper receives cues through an internal receiver that is hidden from MIDI 1.0 applications such as Synthesia. Microsoft MIDI 2.0 diagnostic tools can still enumerate that internal endpoint. The bridge waits for PartyKeys if the keyboard is disconnected. Port names are limited to 24 characters before the receiver suffix because WinMM truncates longer names.
 
-Start the bridge before Synthesia. After restarting the bridge, restart Synthesia if toggling its output does not restore light cues. If another bridge already owns these names, close it before starting another. If a forced shutdown leaves a temporary pair behind, remove that pair in Microsoft's MIDI Settings before restarting; a MIDI service restart also removes transient pairs. This build does not change service settings or restart the service.
+Start the app before Synthesia. If cues do not return after restarting the app, restart Synthesia and select **Synthesia Lights** again. Keep only one bridge instance open.
 
 ### Using loopMIDI instead
 
@@ -195,6 +162,98 @@ For older Windows versions, or when using loopMIDI instead of the native MIDI AP
 
 The screenshot shows the port after clicking **+**, with MIDI traffic passing through it. **Total data** increases as messages arrive; **Throughput / sec.** can return to `0 Byte` between messages. Open loopMIDI before the bridge and Synthesia on later runs too. Use either loopMIDI or the native bridge for this name; stop the native bridge before creating the loopMIDI port to avoid duplicate names.
 
+## Troubleshooting
+
+- **No practice lights:** turn on **Keep selected keys lit**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
+- **Playing keys does not assign colours:** enable **Press keyboard keys to paint / erase** and choose **Paint**. Turn it off again for normal practice.
+- **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
+- **Missing lights on joined boards:** check the connections and octave settings, then reconnect the keyboard. Notes outside the connected boards' range cannot light up.
+- **Resets or a multicoloured startup pattern:** confirm PartyKeys firmware v9, check USB power and the cable, and close other apps controlling the LEDs.
+- **Disconnected keyboard:** leave the app open; it reconnects when the keyboard returns.
+- **Finish playing:** close the app window to stop the bridge and clear its lights.
+
+## Development
+
+The [Executables workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml) builds Windows x64, macOS Apple Silicon, and macOS Intel downloads on native runners. Each build runs the test suite and checks the packaged executable: help, MIDI port enumeration, MIDI-file inspection, dry-run lighting, preview controls, and a real Tk GUI launch. The GUI check runs on native Windows, Intel Mac and Apple Silicon runners, exercises painting/erasing and trail controls, saves settings in a temporary folder, and closes the window without opening MIDI ports. Every push to `main`, pull request, or manual workflow run produces ZIPs and SHA-256 checksums. Releases provide stable downloads of selected builds.
+
+```sh
+python -m unittest discover -s tests -v
+python scripts/smoke_gui.py dist/partykeys  # Use dist/partykeys.exe on Windows
+partykeys test --dry-run --note 60 --seconds 0.1
+partykeys preview "YOUR SONG.mid" --dry-run --lookahead 0.2 --speed 2
+```
+
+`--dry-run` sends no hardware LED output. Preview/test dry runs require no MIDI hardware; bridge dry runs still read a cue input and create the temporary destination when `--virtual-input` is used.
+
+Optional macOS integration check:
+
+```sh
+python tests/coremidi_smoke.py
+python tests/mac_virtual_input_smoke.py
+```
+
+It opens only temporary virtual MIDI ports, verifies routing and cleanup, and has a 30-second watchdog. It does not send to the physical keyboard.
+
+The automatic-setup check tests destination creation, note-on/off routing, refresh, and destination removal without opening hardware ports. Mac executable builds also run it against the packaged binary.
+
+The driver handles RGB/palette framing and state; the bridge interprets cue/physical MIDI; connection management handles discovery and recovery; the song and preview modules handle independent playback. Input uses direct RtMidi polling.
+
+### GUI toolkit and source installs
+
+From a source install, open the window with `partykeys gui` or `python -m partykeys_bridge gui`. For terminal workflows, use `partykeys bridge` or the **Start Synthesia bridge.cmd/.command** launcher.
+
+Python 3.10 or newer with Tk is required for source installs. The UI uses Python's cross-platform Tk toolkit; packaged downloads bundle the runtime. Check Tk with `python -m tkinter`; Linux commonly needs `python3-tk`. Linux uses an existing MIDI input, for example `partykeys gui --input "Your MIDI bus"`; automatic virtual inputs are supported on macOS and compatible Windows installations.
+
+### Install from source on macOS
+
+```sh
+git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
+cd synthesia-partykeys-bridge
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+partykeys ports
+```
+
+Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is available, installation may require macOS Command Line Tools.
+
+### Lighting implementation
+
+Dim practice lights use per-key RGB15 commands alongside the existing fast
+palette cues. RGB and palette writes default to 1 ms pacing. Live GUI changes
+and keyboard painting go straight to the MIDI worker rather than waiting for
+configuration-file reload. Unchanged practice lights send no extra traffic.
+Joined-board RGB addressing and mixed RGB/palette operation require checking on
+your keyboard firmware; automated tests verify message layout, routing and pacing.
+
+### Custom Mac MIDI routing
+
+For custom settings, open Terminal in the extracted folder and run:
+
+```sh
+./partykeys bridge \
+  --virtual-input --input "Synthesia Lights" \
+  --output "PartyKeys" \
+  --keyboard-input "PartyKeys" \
+  --palette-interval-ms 10
+```
+
+Start a song in Synthesia. Close the GUI window to clear the lights and exit. When using the console alternative, press **Ctrl+C** in its terminal.
+
+Port names can be exact names or unambiguous substrings. Use `./partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
+
+With `--virtual-input`, `--input` is the exact name to create, defaulting to **Synthesia Lights**. On macOS this creates a temporary CoreMIDI destination. On Windows 11 25H2+ it uses the bundled experimental native MIDI API helper to create a temporary loopback pair. Existing IAC setups still work: omit `--virtual-input` and use `--input "IAC Driver Synthesia Lights"`. To set up IAC manually, open **Audio MIDI Setup → Window → Show MIDI Studio → IAC Driver**, enable **Device is online**, and add a **Synthesia Lights** bus.
+
+For source installs, use `partykeys` instead of `./partykeys`. Elsewhere in this guide, replace `partykeys` with `./partykeys` for the Mac executable or `.\partykeys.exe` in Windows PowerShell.
+
+### Windows MIDI service details
+
+Synthesia shows just **Synthesia Lights** under Music Output. The helper receives cues through an internal receiver that is hidden from MIDI 1.0 applications such as Synthesia. Microsoft MIDI 2.0 diagnostic tools can still enumerate that internal endpoint. The bridge waits for PartyKeys if the keyboard is disconnected. Port names are limited to 24 characters before the receiver suffix because WinMM truncates longer names.
+
+Start the bridge before Synthesia. After restarting the bridge, restart Synthesia if toggling its output does not restore light cues. If another bridge already owns these names, close it before starting another. If a forced shutdown leaves a temporary pair behind, remove that pair in Microsoft's MIDI Settings before restarting; a MIDI service restart also removes transient pairs. This build does not change service settings or restart the service.
+
+### Windows command-line setup
+
 Custom existing routes also work:
 
 ```powershell
@@ -202,7 +261,7 @@ Custom existing routes also work:
 .\partykeys.exe bridge --input "YOUR CUE INPUT" --output "YOUR PARTYKEYS OUTPUT" --palette-interval-ms 10
 ```
 
-### Native setup from the command line
+#### Native setup from the command line
 
 For automatic native setup from the CLI:
 
@@ -216,7 +275,7 @@ Verified on a Windows 11 25H2 PC: native API port creation, one visible MIDI out
 
 See `WINDOWS-MIDI-PREVIEW.txt` in the Windows download for preview details. Microsoft may change compatibility in later Windows updates; use an updated bridge build when the API ships in Windows.
 
-## JSON settings and palette
+### JSON settings and palette
 
 Use the GUI for everyday colour, brightness, practice-key and trail changes. This section covers advanced routing and manual configuration.
 
@@ -250,7 +309,7 @@ Explicit CLI options override JSON for that run. Use `--config "PATH"` for anoth
 
 This build does **not** automatically follow Synthesia's on-screen custom colours. Its live `settings.db` exposed the last-selected song but no colour keys or per-song colour table during inspection; the changed colour had not reached `tracks.xml` while Synthesia remained open. The JSON palette is independent of that save timing. No Synthesia settings are modified.
 
-## Lighting behavior and speed
+### Lighting behavior and speed
 
 - Synthesia cues use **blue for the left hand** and **green for the right hand**, following the requested Synthesia hand colors.
 - A cue goes dark when Synthesia sends its release. Physical holds do not extend cue duration.
@@ -275,7 +334,7 @@ The CLI defaults to 1 ms. Slower rates remain available through `--palette-inter
 
 Palette mode uses normal preset colours and explicit per-key off messages. The optional `--protocol rgb15` uses custom RGB colors, one key per 1 ms, and a full startup clear after the initial lighting-mode handshake.
 
-### Options
+#### Options
 
 ```sh
 # Change hand colors.
@@ -307,7 +366,7 @@ Notes outside the physical ranges stay unlit. The live palette bridge automatica
 
 Finger-channel defaults use 1-based MIDI channels: left **2–6, 12**; right **1, 7–11, 13**. Override these with `--left-channels` and `--right-channels`. A channel-1 release clears that pitch across all cue channels to handle Synthesia’s shared release channel. Physical held-key state remains separate. Note On with velocity zero is a release; CC16 on channel 1, CC120/123, and MIDI Stop/Reset clear applicable cue state.
 
-## Independent MIDI preview
+### Independent MIDI preview
 
 `preview` reads a MIDI file and supplies its own timing and advance lighting. **It is not synchronized with Synthesia.**
 
@@ -330,52 +389,11 @@ Optional `--audio-output "YOUR SYNTH MIDI INPUT"` plays file notes through a sep
 
 Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timing are rejected. Lights follow note durations rather than sustain-pedal tails.
 
-## Troubleshooting
+### Building the Windows MIDI helper
 
-- **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
-- **Missing or mirrored lights on joined boards:** configure one `--board` destination per board as above, using octave-zero lowest notes. Keep the keyboard input enabled to follow octave buttons automatically; use `--initial-octave` if already shifted at startup. A song note outside your physical range has no key to light. Versions through v0.1.3 broadcast to all boards and do not support explicit destinations.
-- **No cues:** keep the Mac bridge running so its **Synthesia Lights** output is available, or check your manual IAC/Windows loopMIDI port. Check Synthesia's Key Lights setting and keep ordinary music output off the lighting bus. `--debug` shows received messages.
-- **Delayed lights:** check `midi.palette_interval_ms` is `1` in config.json. Synthesia controls when cues arrive.
-- **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.
-- **Shutdown:** cleanup is paced and may take several seconds. A second interrupt aborts remaining cleanup. An unplugged device or killed process cannot be cleared. The previous built-in LED animation is not restored.
+Install a .NET 10 SDK on the build machine, then run `python scripts/build_windows_helper.py`. The script downloads the pinned Microsoft API package, verifies its SHA-256, and publishes a self-contained helper into `native-midi-helper`. Keep this folder beside the source checkout or packaged executable. The build uses Windows API metadata from `C:\Windows\System32\WinMetadata`.
 
-## Install from source on macOS
-
-```sh
-git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
-cd synthesia-partykeys-bridge
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e .
-partykeys ports
-```
-
-Dependencies are `mido` and `python-rtmidi`. If no suitable RtMidi wheel is available, installation may require macOS Command Line Tools.
-
-## Development
-
-The [Executables workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml) builds Windows x64, macOS Apple Silicon, and macOS Intel downloads on native runners. Each build runs the test suite and checks the packaged executable: help, MIDI port enumeration, MIDI-file inspection, dry-run lighting, and preview controls. Every push to `main`, pull request, or manual workflow run produces ZIPs and SHA-256 checksums. Releases provide stable downloads of selected builds.
-
-```sh
-python -m unittest discover -s tests -v
-partykeys test --dry-run --note 60 --seconds 0.1
-partykeys preview "YOUR SONG.mid" --dry-run --lookahead 0.2 --speed 2
-```
-
-`--dry-run` sends no hardware LED output. Preview/test dry runs require no MIDI hardware; bridge dry runs still read a cue input and create the temporary destination when `--virtual-input` is used.
-
-Optional macOS integration check:
-
-```sh
-python tests/coremidi_smoke.py
-python tests/mac_virtual_input_smoke.py
-```
-
-It opens only temporary virtual MIDI ports, verifies routing and cleanup, and has a 30-second watchdog. It does not send to the physical keyboard.
-
-The automatic-setup check tests destination creation, note-on/off routing, refresh, and destination removal without opening hardware ports. Mac executable builds also run it against the packaged binary.
-
-The driver handles RGB/palette framing and state; the bridge interprets cue/physical MIDI; connection management handles discovery and recovery; the song and preview modules handle independent playback. Input uses direct RtMidi polling.
+On a supported Windows 11 PC, run `python tests/windows_midi_smoke.py` to test real native API creation, WinMM delivery, bridge LED state, hidden-receiver behavior, duplicate-instance rejection, and port removal. This test opens only its temporary virtual MIDI endpoints and disables physical keyboard output. It is not run on Windows Server CI runners, which lack the required consumer Windows service.
 
 ## License
 
@@ -387,9 +405,3 @@ This project is licensed under the [MIT License](LICENSE). Bundled dependencies 
 - [PartyKeys RGB protocol reference](https://github.com/allen4z/PartykeysProtocol/blob/main/LED_PROTOCOL.md) and [PartyKeys protocol documentation](https://protocol.partykeys.org/): SysEx framing, RGB encoding, and key layout. Device and speaker-relay profiles differ; this implementation targets the directly connected keyboard.
 - [SynthesiaKontrol](https://github.com/ojacques/SynthesiaKontrol) and [key_led](https://github.com/touchgadget/key_led): Synthesia key-light channel and release interpretation.
 - [Apple IAC setup](https://support.apple.com/guide/audio-midi-setup/transfer-midi-information-between-apps-ams1013/mac) and [Mido RtMidi backend](https://mido.readthedocs.io/en/stable/backends/rtmidi.html).
-
-### Building the Windows MIDI helper
-
-Install a .NET 10 SDK on the build machine, then run `python scripts/build_windows_helper.py`. The script downloads the pinned Microsoft API package, verifies its SHA-256, and publishes a self-contained helper into `native-midi-helper`. Keep this folder beside the source checkout or packaged executable. The build uses Windows API metadata from `C:\Windows\System32\WinMetadata`.
-
-On a supported Windows 11 PC, run `python tests/windows_midi_smoke.py` to test real native API creation, WinMM delivery, bridge LED state, hidden-receiver behavior, duplicate-instance rejection, and port removal. This test opens only its temporary virtual MIDI endpoints and disables physical keyboard output. It is not run on Windows Server CI runners, which lack the required consumer Windows service.
