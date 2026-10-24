@@ -15,7 +15,7 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
    | Windows | **Practice lights.cmd** |
    | macOS, Apple Silicon or Intel | **Practice lights.command** |
 
-4. Keep the window open. For practice lights, choose a colour and click keys, or enable **Press keyboard keys to paint / erase** and play them. For Synthesia, follow the [Mac setup](#set-up-synthesia-on-macos) or [Windows setup](#set-up-on-windows) once, then start a song.
+4. Keep the window open. For practice lights, choose a colour and left-click keys to paint, or right-click to erase. To edit by playing your physical keyboard, enable **Press keys to paint / erase**. For Synthesia, follow the [Mac setup](#set-up-synthesia-on-macos) or [Windows setup](#set-up-on-windows) once, then start a song.
 
 **No Python installation is needed for packaged downloads.** The GUI starts the bridge itself; you do not need to run the console launcher alongside it. Close the window to stop its bridge and clear the lights.
 
@@ -54,10 +54,11 @@ Not sure which Mac download to choose? Open **Apple menu → About This Mac**: �
 ![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
 
 Choose one of the eight preset colours or use **Practice colour** for a custom
-colour, then click keys to paint them. Each key keeps its own colour when you
-change the brush. Choose **Erase** to remove individual keys. Brightness applies
-to all practice keys. Enable **Press keyboard keys to paint / erase** to assign
-the current colour by playing your physical keyboard; turn this off for normal
+colour, then left-click keys to paint them and right-click to erase them
+(Control-click also erases on macOS). Each key keeps its own colour when you
+change the brush. Brightness applies to all practice keys. Under **Physical
+keyboard**, enable **Press keys to paint / erase** and choose **Paint** or **Erase**
+to edit the selection by playing your physical keyboard; turn this off for normal
 practice. Releasing a key does not erase its saved practice colour.
 
 Enable **Trail mode** to fade Synthesia cues after note release, with a duration
@@ -72,7 +73,7 @@ chords can fade in visible steps rather than smoothly.
 
 Click white or black keys to select the exact pitches to keep lit. Scroll to other
 octaves, choose **Practice colour**, and adjust **Brightness** (8% by default).
-Uncheck **Keep selected keys lit** to disable the background without losing your
+Uncheck **Enable practice lights** to disable the background without losing your
 selection. **Clear selection** removes all selected notes. Changes save automatically
 to `config.json`; GUI changes apply immediately while the bridge runs.
 The `live_reload` setting controls edits made to the file outside the GUI.
@@ -165,8 +166,8 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 ## Troubleshooting
 
 - **Wrong keys, shifted lights or a missing second keyboard:** stop the app and unplug the MIDI/USB cable. Return the keyboard to its default octave before plugging the cable back in. If a second keyboard is joined, detach it and attach it again too, then restart the app.
-- **No practice lights:** turn on **Keep selected keys lit**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
-- **Playing keys does not assign colours:** enable **Press keyboard keys to paint / erase** and choose **Paint**. Turn it off again for normal practice.
+- **No practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
+- **Playing keys does not assign colours:** under **Physical keyboard**, enable **Press keys to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
 - **Missing lights on joined boards:** check the connections and octave settings, then reconnect the keyboard. Notes outside the connected boards' range cannot light up.
 - **Resets or a multicoloured startup pattern:** confirm PartyKeys firmware v9, check USB power and the cable, and close other apps controlling the LEDs.

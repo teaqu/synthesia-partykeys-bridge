@@ -13,6 +13,22 @@ from . import settings
 from .practice import note_name, LiveLighting
 
 
+class ColorButton(ttk.Button):
+    """Let the OS theme draw the button and text; show colour in an image.
+
+    Aqua ignores tk.Button backgrounds, leaving custom text colours unreadable.
+    Keep the image alive for as long as its button, including brush updates.
+    """
+    def __init__(self, master, color, **kwargs):
+        self.color_image = tk.PhotoImage(master=master, width=16, height=16)
+        self.color_image.put("#888888", to=(0, 0, 16, 16))
+        self.set_color(color)
+        super().__init__(master, image=self.color_image, compound="left", **kwargs)
+
+    def set_color(self, color):
+        self.color_image.put("#" + color, to=(1, 1, 15, 15))
+
+
 class StatusHandler(logging.Handler):
     def __init__(self, events):
         super().__init__(logging.INFO)
@@ -76,25 +92,32 @@ class Window:
         frame = ttk.Frame(root, padding=18)
         frame.pack(fill="both", expand=True)
         ttk.Label(frame, text="Practice lights", font=("", 18, "bold")).pack(anchor="w")
-        ttk.Label(frame, text="Choose a colour, then click or play keys to paint them. Synthesia cues appear over practice lights.").pack(anchor="w", pady=(4, 14))
+        ttk.Label(frame, text="Choose a colour. Left-click to paint; right-click to erase. Synthesia cues appear over practice lights.",
+                  wraplength=700).pack(anchor="w", pady=(4, 14))
         row = ttk.Frame(frame)
         row.pack(fill="x")
-        ttk.Checkbutton(row, text="Keep selected keys lit", variable=self.enabled, command=self.changed).pack(side="left")
-        self.swatch = tk.Button(row, text="Practice colour", command=self.pick_color, relief="flat", padx=12)
+        self.enable_toggle = ttk.Checkbutton(row, text="Enable practice lights", variable=self.enabled, command=self.changed)
+        self.enable_toggle.pack(side="left")
+        self.swatch = ColorButton(row, self.color, text="Practice colour…", command=self.pick_color)
         self.swatch.pack(side="right")
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=(10, 5))
-        for name, value in (("Blue", "0050FF"), ("Green", "00FF00"), ("Red", "FF0000"),
+        self.presets = {}
+        for index, (name, value) in enumerate((("Blue", "0050FF"), ("Green", "00FF00"), ("Red", "FF0000"),
                             ("Orange", "FF6400"), ("Yellow", "FFFF00"), ("Purple", "B400FF"),
-                            ("Cyan", "00FFB4"), ("White", "FFFFFF")):
-            tk.Button(row, text=name, background="#" + value,
-                      foreground="black" if name in ("Yellow", "Green", "Cyan", "White") else "white",
-                      command=lambda c=value: self.set_brush(c), relief="flat", padx=8).pack(side="left", padx=(0, 4))
+                            ("Cyan", "00FFB4"), ("White", "FFFFFF"))):
+            button = ColorButton(row, value, text=name, width=0, padding=(5, 3),
+                                 command=lambda c=value: self.set_brush(c))
+            button.grid(row=index // 4, column=index % 4, sticky="ew", padx=2, pady=2)
+            self.presets[name] = button
+        for column in range(4):
+            row.columnconfigure(column, weight=1, uniform="colours")
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=5)
+        ttk.Label(row, text="Physical keyboard:").pack(side="left", padx=(0, 8))
         ttk.Radiobutton(row, text="Paint", variable=self.paint_mode, value="paint", command=self.push_live).pack(side="left")
         ttk.Radiobutton(row, text="Erase", variable=self.paint_mode, value="erase", command=self.push_live).pack(side="left", padx=10)
-        ttk.Checkbutton(row, text="Press keyboard keys to paint / erase", variable=self.capture_enabled,
+        ttk.Checkbutton(row, text="Press keys to paint / erase", variable=self.capture_enabled,
                         command=self.set_capture).pack(side="left", padx=10)
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=10)
@@ -109,6 +132,11 @@ class Window:
         self.keys = {}
         self.draw_keyboard()
         self.canvas.bind("<Button-1>", self.click)
+        # Aqua numbers the secondary mouse button as 2; Windows/X11 use 3.
+        self.secondary_click = "<Button-2>" if root.tk.call("tk", "windowingsystem") == "aqua" else "<Button-3>"
+        self.canvas.bind(self.secondary_click, lambda event: self.click(event, erase=True))
+        if root.tk.call("tk", "windowingsystem") == "aqua":
+            self.canvas.bind("<Control-Button-1>", lambda event: self.click(event, erase=True))
         def show_start_octave():
             self.canvas.xview_moveto(max(0, (args.base_note // 12 * 7 * 30 - 30) / (75 * 30)))
         root.after(50, show_start_octave)
@@ -156,7 +184,7 @@ class Window:
                 continue
             x = white * 30
             self.keys[note] = self.canvas.create_rectangle(x, 0, x + 30, 130, fill="white", outline="#a8adb5", tags=(f"note:{note}",))
-            self.canvas.create_text(x + 15, 114, text=note_name(note), font=("", 8), tags=(f"note:{note}",))
+            self.canvas.create_text(x + 15, 114, text=note_name(note), font=("", 8), fill="#14161b", tags=(f"note:{note}",))
             white += 1
         white = 0
         for note in range(128):
@@ -167,18 +195,21 @@ class Window:
             self.keys[note] = self.canvas.create_rectangle(x, 0, x + 20, 78, fill="#252932", outline="#14161b", tags=(f"note:{note}",))
         self.canvas.configure(scrollregion=(0, 0, white * 30, 132))
 
-    def click(self, event):
+    def click(self, event, erase=False):
         item = self.canvas.find_withtag("current")
         if not item:
             return
         for tag in self.canvas.gettags(item[0]):
             if tag.startswith("note:"):
                 note = int(tag.split(":")[1])
-                self.paint_note(note)
+                self.paint_note(note, erase=erase)
                 break
+        return "break"
 
-    def paint_note(self, note):
-        if self.paint_mode.get() == "erase":
+    def paint_note(self, note, erase=None):
+        if erase is None:
+            erase = self.paint_mode.get() == "erase"
+        if erase:
             self.selected.discard(note)
             self.note_colors.pop(note, None)
         else:
@@ -193,7 +224,7 @@ class Window:
             self.status.set("Keyboard painting on · Press keys to apply the current colour")
         else:
             self.capture.clear()
-            self.status.set("Keyboard painting off · Your saved keys stay lit")
+            self.status.set("Keyboard painting off · Your practice selection is saved")
 
     def set_brush(self, color):
         self.color = color
@@ -209,7 +240,7 @@ class Window:
         for note, item in self.keys.items():
             fill = "#" + self.note_colors.get(note, self.color) if note in self.selected else ("#252932" if note % 12 in (1, 3, 6, 8, 10) else "white")
             self.canvas.itemconfigure(item, fill=fill)
-        self.swatch.configure(background="#" + self.color, foreground="white" if sum(int(self.color[i:i+2], 16) for i in (0, 2, 4)) < 380 else "black")
+        self.swatch.set_color(self.color)
         self.percent.set(f"{round(self.brightness.get())}%")
         self.trail_percent.set(f"{round(self.trail_brightness.get())}%")
         names = ", ".join(note_name(n) for n in sorted(self.selected))
@@ -354,12 +385,32 @@ def smoke_test(args):
         Path(args.config).write_text(json.dumps(settings.DEFAULTS), encoding="utf-8")
         root = tk.Tk()
         window = Window(root, args, auto_start=False)
+        root.geometry("740x650")  # Exercise the smallest supported layout.
 
         def fail(error):
             failures.append(str(error))
             root.destroy()
 
         root.report_callback_exception = lambda kind, error, tb: fail(error)
+
+        def pointer(note, sequence, y=100):
+            x1, _, x2, _ = window.canvas.coords(window.keys[note])
+            x = round((x1 + x2) / 2 - window.canvas.canvasx(0))
+            window.canvas.event_generate("<Motion>", x=x, y=y)
+            window.canvas.event_generate(sequence, x=x, y=y)
+            window.canvas.event_generate(sequence.replace("Button-", "ButtonRelease-"), x=x, y=y)
+
+        def check_erase_and_close():
+            try:
+                assert 67 not in window.selected, "Physical-key erase mode was not handled"
+                assert window.save(), "GUI settings did not save"
+                saved = settings.load(args.config, required=True)
+                assert saved["practice"]["note_colors"] == {"64": "FF0000"}
+                assert saved["trail"] == dict(enabled=True, duration_seconds=12., max_brightness=.25)
+                assert window.worker is None, "GUI smoke test opened a MIDI worker"
+                window.close()
+            except Exception as error:
+                fail(error)
 
         def check_capture_and_close():
             try:
@@ -368,17 +419,13 @@ def smoke_test(args):
                 window.paint_mode.set("erase")
                 window.paint_note(60)
                 assert 60 not in window.selected, "Erase did not remove the key"
+                window.key_events.put(67)
                 window.trail_enabled.set(True)
                 window.trail_brightness.set(25)
                 window.trail_seconds.set("12")
                 window.changed()
                 assert window.trail_percent.get() == "25%", "Trail brightness control did not update"
-                assert window.save(), "GUI settings did not save"
-                saved = settings.load(args.config, required=True)
-                assert saved["practice"]["note_colors"]["64"] == "FF0000"
-                assert saved["trail"] == dict(enabled=True, duration_seconds=12., max_brightness=.25)
-                assert window.worker is None, "GUI smoke test opened a MIDI worker"
-                window.close()
+                root.after(100, check_erase_and_close)
             except Exception as error:
                 fail(error)
 
@@ -387,11 +434,34 @@ def smoke_test(args):
                 assert root.winfo_viewable(), "GUI window did not become visible"
                 assert window.canvas.winfo_width() > 100, "Keyboard canvas was not laid out"
                 assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
-                window.set_brush("0050FF")
-                window.paint_note(60)
-                window.set_brush("FF0000")
-                window.paint_note(64)
+                assert window.swatch.winfo_ismapped(), "Custom colour button was not laid out"
+                for button in window.presets.values():
+                    assert button.winfo_ismapped(), "Preset colour button was not laid out"
+                    assert button.winfo_x() + button.winfo_width() <= button.master.winfo_width(), "Preset colour button was clipped"
+                    assert str(button.cget("image")), "Preset has no colour swatch"
+                window.presets["Blue"].invoke()
+                assert window.color == "0050FF", "Blue preset did not change the brush"
+                window.paint_mode.set("erase")
+                pointer(60, "<Button-1>")
+                assert window.note_colors[60] == "0050FF", "Left-click did not paint in keyboard erase mode"
+                pointer(61, "<Button-1>", y=40)
+                assert 61 in window.selected, "Left-click did not paint a black key"
+                window.paint_mode.set("paint")
+                pointer(61, window.secondary_click, y=40)
+                assert 61 not in window.selected, "Right-click did not erase a black key in keyboard paint mode"
+                assert 60 in window.selected, "Erasing a black key also erased the white key underneath"
+                if root.tk.call("tk", "windowingsystem") == "aqua":
+                    pointer(60, "<Control-Button-1>")
+                    assert 60 not in window.selected, "Mac Control-click did not erase"
+                    pointer(60, "<Button-1>")
+                window.presets["Red"].invoke()
+                pointer(64, "<Button-1>")
                 assert window.note_colors[60] == "0050FF", "Changing brush recoloured an existing key"
+                window.enable_toggle.invoke()
+                assert not window.enabled.get(), "Practice lights did not disable"
+                assert set(window.selected) == {60, 64}, "Disabling practice lights lost the selection"
+                window.enable_toggle.invoke()
+                assert window.enabled.get(), "Practice lights did not enable"
                 window.capture_enabled.set(True)
                 window.set_capture()
                 window.key_events.put(67)
