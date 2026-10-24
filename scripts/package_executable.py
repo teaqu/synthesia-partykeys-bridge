@@ -2,6 +2,8 @@
 from pathlib import Path
 import argparse
 import hashlib
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -11,7 +13,11 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("platform", choices=("windows-x64", "macos-arm64", "macos-x64"))
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
-name = "partykeys-" + args.platform
+project = (root / "pyproject.toml").read_text(encoding="utf-8").split("[project]", 1)[1].split("\n[", 1)[0]
+version = re.search(r'^version\s*=\s*"([^"]+)"', project, re.MULTILINE).group(1)
+if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.+-]*", version):
+    raise SystemExit("Project version cannot be used in an archive filename")
+name = f"partykeys-lights-v{version}-{args.platform}"
 bundle = root / "dist" / name
 bundle.mkdir(parents=True, exist_ok=True)
 windows = args.platform.startswith("windows-")
@@ -45,3 +51,7 @@ with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 archive.with_suffix(".sha256").write_text(f"{digest}  {archive.name}\n", encoding="ascii")
 print(f"Packaged {archive.name}: {digest}")
+if os.environ.get("GITHUB_OUTPUT"):
+    with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+        output.write(f"name={name}\narchive={archive.relative_to(root).as_posix()}\n"
+                     f"checksum={archive.with_suffix('.sha256').relative_to(root).as_posix()}\n")

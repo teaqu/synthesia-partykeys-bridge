@@ -61,11 +61,12 @@ jobs:
         if: runner.os == 'macOS'
         run: python tests/mac_virtual_input_smoke.py dist/${{ matrix.executable }}
       - name: Package executable and instructions
+        id: package
         run: python scripts/package_executable.py ${{ matrix.name }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: partykeys-${{ matrix.name }}
+          name: ${{ steps.package.outputs.name }}
           path: |
-            dist/partykeys-${{ matrix.name }}.zip
-            dist/partykeys-${{ matrix.name }}.sha256
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.checksum }}
           if-no-files-found: error

@@ -6,7 +6,7 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
 ## Get started
 
-1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-x64.zip).
+1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip).
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
 3. Open the launcher for your platform:
 
@@ -31,21 +31,21 @@ The console launcher remains available for terminal use.
 
 ## Downloads
 
-[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-arm64.zip)
-[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-x64.zip)
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-windows-x64.zip)
+[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip)
+[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip)
 
 Each download includes the desktop app, **Practice lights** launcher, console launcher, setup guide and license notices. No GitHub sign-in is needed.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
-| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/partykeys-lights/releases/latest/download/partykeys-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
+| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
 
 Not sure which Mac download to choose? Open **Apple menu → About This Mac**: “Chip: Apple M…” means Apple Silicon; “Processor: Intel…” means Intel.
 
-[Release notes and all downloads](https://github.com/teaqu/partykeys-lights/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/partykeys-lights/releases/latest/download/SHA256SUMS.txt)
+[Release notes and all downloads](https://github.com/teaqu/partykeys-lights/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/SHA256SUMS-v0.1.6.txt)
 
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
@@ -164,6 +164,7 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 
 ## Troubleshooting
 
+- **Wrong keys light up or the lights are shifted:** stop the app and disconnect MIDI. Return the keyboard to its default octave before reconnecting MIDI, then open the app again.
 - **No practice lights:** turn on **Keep selected keys lit**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
 - **Playing keys does not assign colours:** enable **Press keyboard keys to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
