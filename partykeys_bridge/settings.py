@@ -16,7 +16,9 @@ DEFAULTS = {
     "lighting": {"left_color": "blue", "right_color": "green",
                  "rgb_brightness": 1.0},
     "midi": {"create_virtual_input": True, "input": "Synthesia Lights",
-             "palette_interval_ms": 10},
+             "palette_interval_ms": 1},
+    "practice": {"enabled": False, "notes": [], "color": "0050FF", "brightness": 0.08, "note_colors": {}},
+    "trail": {"enabled": False, "duration_seconds": 1.5, "max_brightness": .35},
 }
 
 
@@ -79,10 +81,36 @@ def load(path, required=False):
     brightness = config["lighting"]["rgb_brightness"]
     if type(brightness) not in (int, float) or not math.isfinite(brightness) or not 0 <= brightness <= 1:
         raise ValueError("lighting.rgb_brightness must be between 0 and 1")
+    practice = config["practice"]
+    if type(practice["enabled"]) is not bool:
+        raise ValueError("practice.enabled must be true or false")
+    notes = practice["notes"]
+    if not isinstance(notes, list) or any(type(n) is not int or not 0 <= n <= 127 for n in notes):
+        raise ValueError("practice.notes must be a list of MIDI notes from 0 to 127")
+    rgb(practice["color"])
+    colors = practice["note_colors"]
+    if not isinstance(colors, dict):
+        raise ValueError("practice.note_colors must map MIDI note numbers to RGB colours")
+    for note, value in colors.items():
+        if not isinstance(note, str) or note not in {str(n) for n in range(128)}:
+            raise ValueError("practice.note_colors keys must be MIDI note numbers from 0 to 127")
+        rgb(value)
+    trail = config["trail"]
+    duration = trail["duration_seconds"]
+    if type(trail["enabled"]) is not bool:
+        raise ValueError("trail.enabled must be true or false")
+    if type(duration) not in (int, float) or not math.isfinite(duration) or not .25 <= duration <= 30:
+        raise ValueError("trail.duration_seconds must be between 0.25 and 30")
+    maximum = trail["max_brightness"]
+    if type(maximum) not in (int, float) or not math.isfinite(maximum) or not 0 <= maximum <= 1:
+        raise ValueError("trail.max_brightness must be between 0 and 1")
+    brightness = practice["brightness"]
+    if type(brightness) not in (int, float) or not math.isfinite(brightness) or not 0 <= brightness <= 1:
+        raise ValueError("practice.brightness must be between 0 and 1")
     if not isinstance(config["midi"]["input"], str) or not config["midi"]["input"].strip():
         raise ValueError("midi.input must be a nonempty MIDI destination name")
-    if type(config["midi"]["palette_interval_ms"]) is not int or config["midi"]["palette_interval_ms"] not in (10,20,40,100,250):
-        raise ValueError("midi.palette_interval_ms must be 10, 20, 40, 100, or 250")
+    if type(config["midi"]["palette_interval_ms"]) is not int or config["midi"]["palette_interval_ms"] not in (1,10,20,40,100,250):
+        raise ValueError("midi.palette_interval_ms must be 1, 10, 20, 40, 100, or 250")
     return config
 
 
@@ -114,6 +142,7 @@ class ConfigWatcher:
         self.stopped = threading.Event()
         self.thread = None
         self.last_error = None
+        self.practice_pending = queue.Queue(maxsize=1)
 
     def poll(self):
         try:
@@ -138,6 +167,11 @@ class ConfigWatcher:
         except queue.Empty:
             pass
         self.pending.put_nowait((colors, brightness))
+        try:
+            self.practice_pending.get_nowait()
+        except queue.Empty:
+            pass
+        self.practice_pending.put_nowait((config["practice"], config["trail"]))
 
     def start(self):
         if self.thread or not self.config["live_reload"]:
@@ -151,6 +185,13 @@ class ConfigWatcher:
         self.thread.start()
 
     def apply(self, session):
+        try:
+            practice, trail = self.practice_pending.get_nowait()
+            if getattr(session.args, "live_lighting", None) is None:
+                session.bridge.set_practice(practice)
+                session.bridge.set_trail(trail)
+        except queue.Empty:
+            pass
         try:
             colors, brightness = self.pending.get_nowait()
         except queue.Empty:

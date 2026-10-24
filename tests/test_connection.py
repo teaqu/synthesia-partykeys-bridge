@@ -30,6 +30,27 @@ class Device:
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_keyboard_paint_is_applied_in_the_receiving_tick_without_ui_or_disk(self):
+        import queue
+        import threading
+        from partykeys_bridge.practice import LiveLighting
+        live = LiveLighting()
+        trail = dict(enabled=False, duration_seconds=1.5)
+        live.publish(dict(enabled=True, notes=[], color="FF0000", brightness=.2, note_colors={}), trail)
+        self.session.args.live_lighting = live
+        self.session.args.practice_capture = threading.Event()
+        self.session.args.practice_capture.set()
+        self.session.args.practice_key_events = queue.SimpleQueue()
+        self.step()
+        self.session.ports["pressed"].pending.append(mido.Message("note_on", note=60, velocity=80))
+        self.session.tick()
+        self.assertEqual(self.session.bridge.lights()[60], (51, 0, 0))
+        self.assertEqual(self.session.args.practice_key_events.get_nowait(), 60)
+        live.publish(self.session.bridge.practice, trail, erase=True)
+        self.session.ports["pressed"].pending.append(mido.Message("note_on", note=60, velocity=80))
+        self.session.tick()
+        self.assertNotIn(60, self.session.bridge.lights())
+
     def setUp(self):
         discovery = patch("partykeys_bridge.routing.discover_boards", return_value=([(1, 0x3f, 48)], {1: 0}))
         discovery.start()

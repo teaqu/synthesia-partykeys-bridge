@@ -28,9 +28,12 @@ if windows:
                     ignore=shutil.ignore_patterns("*.pdb"))
     shutil.copy2(root / "native" / "windows-midi-helper" / "PREVIEW.txt", bundle / "WINDOWS-MIDI-PREVIEW.txt")
 shutil.copy2(root / "config.json", bundle / "config.json")
+practice_launcher = "Practice lights.cmd" if windows else "Practice lights.command"
+shutil.copy2(root / "packaging" / practice_launcher, bundle / practice_launcher)
 if not windows:
     (bundle / exe).chmod(0o755)
     (bundle / launcher).chmod(0o755)
+    (bundle / practice_launcher).chmod(0o755)
 shutil.copytree(root / "docs" / "images", bundle / "docs" / "images", dirs_exist_ok=True)
 subprocess.run([sys.executable, str(root / "scripts" / "bundle_notices.py"),
                 str(bundle)], check=True)

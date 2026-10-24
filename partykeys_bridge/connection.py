@@ -2,12 +2,14 @@
 import logging
 import sys
 import time
+import threading
 
 import mido
 import rtmidi
 
 from .driver import MidiInput, PalettePartyKeys, make_driver, octave_report, select_port
 from .windows_midi import WindowsVirtualInput, existing_route
+from .practice import capture_key, paint_practice
 
 LOG = logging.getLogger("partykeys")
 # InvalidPortError inherits ValueError, not RuntimeError/OSError. Catch the
@@ -39,6 +41,8 @@ class BridgeConnection:
         self.clear_generation = self.bridge.clear_generation
         self.print_port = print_port
         self.keyboard_octaves = {}
+        self.live_generation = -1
+        self.practice_erase = False
 
     def restore_octaves(self):
         if isinstance(self.driver, PalettePartyKeys):
@@ -171,6 +175,14 @@ class BridgeConnection:
     def tick(self):
         if self.config_watcher:
             self.config_watcher.apply(self)
+        live = getattr(self.args, "live_lighting", None)
+        if live is not None:
+            generation, value = live.snapshot()
+            if value is not None and generation != self.live_generation:
+                practice, trail, self.practice_erase = value
+                self.bridge.set_practice(practice)
+                self.bridge.set_trail(trail)
+                self.live_generation = generation
         if self.now() >= self.next_scan:
             self.next_scan = self.now() + 1
             self.refresh()
@@ -183,6 +195,9 @@ class BridgeConnection:
                     if kind == "cue":
                         self.bridge.receive(message)
                     else:
+                        captured = capture_key(self.args, message)
+                        if captured is not None:
+                            self.bridge.set_practice(paint_practice(self.bridge.practice, captured, self.practice_erase))
                         if self.topology:
                             self.topology.receive(message)
                         report = octave_report(message)
@@ -248,8 +263,9 @@ class BridgeConnection:
         try:
             if self.config_watcher:
                 self.config_watcher.start()
-            while True:
+            stop = getattr(self.args, "stop_event", None) or threading.Event()
+            while not stop.is_set():
                 self.tick()
-                time.sleep(0.01)
+                stop.wait(0.001)
         finally:
             self.close()

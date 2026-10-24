@@ -212,7 +212,7 @@ class ProtocolTests(ClockedTests):
         driver.show({}, force=True)
         self.assertEqual(driver.state[14], (0, 0, 0))
         self.assertGreaterEqual(times[1] - times[0], 1.0)
-        self.assertTrue(all(b-a >= 0.25 for a,b in zip(times, times[1:])))
+        self.assertTrue(all(b-a >= 0.04 - 1e-9 for a,b in zip(times, times[1:])))
         self.assertFalse(any(m.data[-1] == 13 for m in port.sent[37:]))
 
     def test_nonblocking_init_keeps_input_loop_available(self):
@@ -358,7 +358,7 @@ class PaletteTests(ClockedTests):
         driver.clear()
         self.assertEqual(len(port.sent), count)
 
-    def test_palette_default_keeps_250ms_spacing_for_older_firmware(self):
+    def test_palette_default_uses_1ms_spacing(self):
         port = Port()
         times = []
         send = port.send
@@ -369,13 +369,13 @@ class PaletteTests(ClockedTests):
             driver.show({60: (0,80,255), 64: (0,80,255), 67: (0,80,255)}, force=True)
             driver.clear()
         gaps = [b-a for a,b in zip(times[1:], times[2:])]
-        self.assertTrue(all(abs(gap - 0.25) < 1e-9 for gap in gaps))
+        self.assertTrue(all(abs(gap - 0.001) < 1e-9 for gap in gaps))
         self.assertEqual(len(port.sent), 7)
         self.assertTrue(all(m.data[7] == 3 for m in port.sent[1:]))
         self.assertTrue(all(len(m.bytes()) == 16 for m in port.sent[1:]))
 
     def test_explicit_fast_palette_rate_applies_to_chords_and_cleanup(self):
-        for interval_ms in (10, 20, 40):
+        for interval_ms in (1, 10, 20, 40):
             with self.subTest(interval_ms=interval_ms):
                 args = parser().parse_args(['bridge', '--palette-interval-ms', str(interval_ms)])
                 port = Port()
@@ -389,8 +389,8 @@ class PaletteTests(ClockedTests):
                 self.assertEqual(len(port.sent), 5)
                 self.assertTrue(all(abs(b-a-interval_ms/1000) < 1e-9 for a,b in zip(times[1:], times[2:])))
                 args.protocol = 'rgb15'
-                self.assertEqual(make_driver(Port(), args).min_interval, .25)
-        self.assertEqual(PalettePartyKeys(Port(), min_interval=0).min_interval, .01)
+                self.assertEqual(make_driver(Port(), args).min_interval, .001)
+        self.assertEqual(PalettePartyKeys(Port(), min_interval=0).min_interval, .001)
 
     def test_batch_discards_obsolete_cues_and_turns_off_first(self):
         driver = PalettePartyKeys(Port())

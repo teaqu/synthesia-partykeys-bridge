@@ -16,9 +16,21 @@
     "right_color": "green",
     "rgb_brightness": 1.0
   },
+  "practice": {
+    "enabled": false,
+    "notes": [],
+    "color": "0050FF",
+    "brightness": 0.08,
+    "note_colors": {}
+  },
+  "trail": {
+    "enabled": false,
+    "duration_seconds": 1.5,
+    "max_brightness": 0.35
+  },
   "midi": {
     "create_virtual_input": true,
     "input": "Synthesia Lights",
-    "palette_interval_ms": 10
+    "palette_interval_ms": 1
   }
 }

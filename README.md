@@ -190,13 +190,14 @@ Palette mode (`palette71`, the bridge default) sends up to **three note/color pa
 | `20` | 50/second | Slower alternative |
 | `40` | 25/second | Slower alternative |
 | `100` | 10/second | Diagnostic option |
-| `250` | 4/second | Conservative CLI default |
+| `1` | 1000/second | Default |
+| `250` | 4/second | Optional slower rate |
 
-These are minimum send intervals, not measured end-to-end LED latency. Every write, including forced updates and cleanup, is paced. A three-note chord fits in one packet; larger changes take multiple packets. The main loop polls every 10 ms.
+These are minimum send intervals, not measured end-to-end LED latency. Every write, including forced updates and cleanup, is paced. A three-note chord fits in one palette packet; larger changes take multiple packets. The main loop polls every 1 ms.
 
-The CLI keeps a conservative 250 ms default. **Pass `--palette-interval-ms 10` for the fast setup above.** Firmware v9 is required at every speed.
+The CLI defaults to 1 ms. Slower rates remain available through `--palette-interval-ms`. Firmware v9 is required at every speed.
 
-Palette mode uses normal preset colours and explicit per-key off messages. The optional `--protocol rgb15` uses custom RGB colors, one key per 250 ms, and a full startup clear that takes about ten seconds. Use palette mode for responsive Synthesia lighting.
+Palette mode uses normal preset colours and explicit per-key off messages. The optional `--protocol rgb15` uses custom RGB colors, one key per 1 ms, and a full startup clear after the initial lighting-mode handshake.
 
 ### Options
 
@@ -258,7 +259,7 @@ Type 0/1 PPQN MIDI files and tempo changes are supported. Type 2 and SMPTE timin
 - **Resets or a multicoloured startup pattern:** stop sending LED commands and confirm keyboard firmware v9. Check the USB cable, power, and other LED-controlling apps. Try a larger `--palette-interval-ms` value, such as `20` or `40`, to slow LED updates while diagnosing. The bridge's automatic reconnection cannot fix a device firmware or power fault.
 - **Missing or mirrored lights on joined boards:** configure one `--board` destination per board as above, using octave-zero lowest notes. Keep the keyboard input enabled to follow octave buttons automatically; use `--initial-octave` if already shifted at startup. A song note outside your physical range has no key to light. Versions through v0.1.3 broadcast to all boards and do not support explicit destinations.
 - **No cues:** keep the Mac bridge running so its **Synthesia Lights** output is available, or check your manual IAC/Windows loopMIDI port. Check Synthesia's Key Lights setting and keep ordinary music output off the lighting bus. `--debug` shows received messages.
-- **Delayed lights:** include `--palette-interval-ms 10`; the default is 250 ms. Synthesia controls when cues arrive.
+- **Delayed lights:** check `midi.palette_interval_ms` is `1` in config.json. Synthesia controls when cues arrive.
 - **Disconnected device:** bridge mode retries missing ports and MIDI errors once per second, then initializes and applies current state. Preview mode stops on disconnection. Already-held physical keys cannot be reconstructed; release and press again.
 - **Shutdown:** cleanup is paced and may take several seconds. A second interrupt aborts remaining cleanup. An unplugged device or killed process cannot be cleared. The previous built-in LED animation is not restored.
 
@@ -316,3 +317,58 @@ This project is licensed under the [MIT License](LICENSE). Bundled dependencies 
 Install a .NET 10 SDK on the build machine, then run `python scripts/build_windows_helper.py`. The script downloads the pinned Microsoft API package, verifies its SHA-256, and publishes a self-contained helper into `native-midi-helper`. Keep this folder beside the source checkout or packaged executable. The build uses Windows API metadata from `C:\Windows\System32\WinMetadata`.
 
 On a supported Windows 11 PC, run `python tests/windows_midi_smoke.py` to test real native API creation, WinMM delivery, bridge LED state, hidden-receiver behavior, duplicate-instance rejection, and port removal. This test opens only its temporary virtual MIDI endpoints and disables physical keyboard output. It is not run on Windows Server CI runners, which lack the required consumer Windows service.
+
+## Practice lights window
+
+![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
+
+Choose one of the eight preset colours or use **Practice colour** for a custom
+colour, then click keys to paint them. Each key keeps its own colour when you
+change the brush. Choose **Erase** to remove individual keys. Brightness applies
+to all practice keys. Enable **Press keyboard keys to paint / erase** to assign
+the current colour by playing your physical keyboard; turn this off for normal
+practice. Releasing a key does not erase its saved practice colour.
+
+Enable **Trail mode** to fade Synthesia cues after note release, with a duration
+from 0.25 to 30 seconds. **Trail max brightness** caps the released trail (35%
+by default) independently of practice brightness and held cues. On release it
+immediately drops to that cap and visibly fades during the first 120 ms, even
+with a long duration; the remaining tail then fades to zero over the selected
+duration. Held cues stay bright and repeated notes light fully
+again. Saved practice colours remain underneath trails. Song stop/reset clears
+trails immediately. RGB updates are paced by the keyboard protocol, so large
+chords can fade in visible steps rather than smoothly.
+
+Open **Practice lights.cmd** on Windows or **Practice lights.command** on macOS
+from the extracted download. This starts a small piano window and the Synthesia
+bridge together. Stop any older bridge instance first. You can also run
+`partykeys gui` (or `python -m partykeys_bridge gui` from source).
+
+Click white or black keys to select the exact pitches to keep lit. Scroll to other
+octaves, choose **Practice colour**, and adjust **Brightness** (8% by default).
+Uncheck **Keep selected keys lit** to disable the background without losing your
+selection. **Clear selection** removes all selected notes. Changes save automatically
+to `config.json` and apply while the bridge runs when `live_reload` is enabled.
+Only pitches available on the connected boards light up; labels use C4 = MIDI 60.
+
+Synthesia continues to use **Music Output → Synthesia Lights → Key Lights →
+Finger-based channel**. Its hand cues override practice lights; releasing a cue
+restores the faint colour. Resetting or stopping a song keeps your practice
+selection. Closing the window stops its bridge, clears LEDs and releases ports.
+The **Left hand…** and **Right hand…** buttons change Synthesia cue colours
+(the fast palette protocol uses the closest supported hue).
+
+Dim practice lights use per-key RGB15 commands alongside the existing fast
+palette cues. RGB and palette writes default to 1 ms pacing. Live GUI changes
+and keyboard painting go straight to the MIDI worker rather than waiting for
+configuration-file reload. Unchanged practice lights send no extra traffic.
+Joined-board RGB addressing and mixed RGB/palette operation require checking on
+your keyboard firmware; automated tests verify message layout, routing and pacing.
+
+The UI uses Python's cross-platform Tk toolkit without browser or web-server
+dependencies. Windows and macOS packages bundle it with the executable. For source
+installs, use Python with Tk support (`python -m tkinter` to check; Linux commonly
+needs `python3-tk`). Linux uses an existing MIDI input, for example
+`partykeys gui --input "Your MIDI bus"`; automatic virtual inputs are available on
+macOS and supported Windows installations. CI builds Windows x64, macOS Intel and
+Apple Silicon; native macOS testing is still required for a new UI build.

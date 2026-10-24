@@ -72,15 +72,15 @@ def parser():
     commands.add_parser("ports", help="List MIDI inputs and outputs")
     inspect = commands.add_parser("inspect", help="Show MIDI tracks and duration without hardware")
     inspect.add_argument("file")
-    for mode in ("bridge", "preview", "test"):
+    for mode in ("bridge", "preview", "test", "gui"):
         sub = commands.add_parser(mode)
         sub.add_argument("--output", help="Exact MIDI output name or unique substring (auto: PartyKeys)")
         sub.add_argument("--protocol", choices=("palette71", "rgb15"),
-                         default="palette71" if mode == "bridge" else "rgb15",
+                         default="palette71" if mode in ("bridge", "gui") else "rgb15",
                          help="palette71 uses preset colors and fixed device brightness")
         sub.add_argument("--brightness", type=finite, default=1.0)
-        sub.add_argument("--palette-interval-ms", type=int, choices=(10, 20, 40, 100, 250), default=250,
-                         help="palette message spacing; default 250; faster rates require hardware validation")
+        sub.add_argument("--palette-interval-ms", type=int, choices=(1, 10, 20, 40, 100, 250), default=1,
+                         help="LED message spacing in milliseconds; default 1")
         sub.add_argument("--base-note", type=int, default=48, help="MIDI note of leftmost key; default 48")
         sub.add_argument("--board", type=board, action="append", default=[],
                          help="Palette board CHANNEL:ADDRESS:LOWEST_NOTE at octave zero; repeat for joined boards")
@@ -96,9 +96,9 @@ def parser():
             continue
         sub.add_argument("--left-color", type=color, default=(0, 80, 255))
         sub.add_argument("--right-color", type=color, default=(0, 255, 0) if mode == "bridge" else (255, 100, 0))
-        sub.add_argument("--left-channels", type=channels, default=None if mode == "bridge" else {1})
-        sub.add_argument("--right-channels", type=channels, default=None if mode == "bridge" else {0})
-        if mode == "bridge":
+        sub.add_argument("--left-channels", type=channels, default=None if mode in ("bridge", "gui") else {1})
+        sub.add_argument("--right-channels", type=channels, default=None if mode in ("bridge", "gui") else {0})
+        if mode in ("bridge", "gui"):
             sub.add_argument("--config", help="JSON settings file (default: config.json beside the executable)")
             sub.add_argument("--input", help="Cue MIDI input or unique substring; with --virtual-input, name to create")
             sub.add_argument("--virtual-input", action="store_true",
@@ -289,6 +289,10 @@ def run_preview(args, song, driver, preview, audio, output_name, audio_name):
 
 
 def execute(args):
+    if args.command == "gui":
+        from .ui import run
+        run(args)
+        return
     if args.command == "inspect":
         song = Song.load(args.file)
         print(f"{len(song.notes)} notes; {song.duration:.3f} seconds")
@@ -305,6 +309,8 @@ def execute(args):
     bridge = preview = song = None
     if args.command == "bridge":
         bridge = Bridge(args.left_color, args.right_color, args.left_channels, args.right_channels)
+        bridge.set_practice(getattr(args, "practice", settings.DEFAULTS["practice"]))
+        bridge.set_trail(getattr(args, "trail", settings.DEFAULTS["trail"]))
         BridgeConnection(args, bridge, PrintPort(), config_watcher=getattr(args, "config_watcher", None)).run()
         return
     elif args.command == "preview":
@@ -357,11 +363,18 @@ def main(argv=None):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)
     try:
-        if args.command == "bridge":
+        if args.command in ("bridge", "gui"):
+            args.startup_argv = argv
+            config_required = bool(args.config)
             config_path = args.config or settings.default_path()
-            if args.config or config_path.is_file():
-                config = settings.load(config_path, required=True)
+            args.config = str(config_path)
+            args.practice = settings.DEFAULTS["practice"]
+            args.trail = settings.DEFAULTS["trail"]
+            if config_required or config_path.is_file():
+                config = settings.load(config_path, required=config_required)
                 settings.apply_startup(args, config, argv)
+                args.practice = config["practice"]
+                args.trail = config["trail"]
                 args.config_watcher = settings.ConfigWatcher(config_path, config, args, argv)
         execute(args)
         return 0

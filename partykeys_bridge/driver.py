@@ -7,6 +7,7 @@ import math
 import time
 
 import mido
+from .practice import ExactRGB
 
 HEADER = (0x05, 0x30, 0x7F, 0x7F, 0x20, 0x00)
 BLACK = (0, 0, 0)
@@ -85,8 +86,8 @@ def rgb_messages(colors, channel=0x7f, address=0x7f):
 
 
 class PartyKeys:
-    MIN_INTERVAL = 0.25  # RGB15: faster writes failed on the user's unit.
-    DEFAULT_INTERVAL = 0.25
+    MIN_INTERVAL = 0.001
+    DEFAULT_INTERVAL = 0.001
     BATCH_SIZE = 1
 
     def __init__(self, port, brightness=1.0, base_note=48, min_interval=None,
@@ -213,7 +214,7 @@ class PalettePartyKeys(PartyKeys):
     Based on the published bridge, with slower pacing required by this unit.
     Never emit CMD71 with a zero note count (the global all-off command).
     """
-    MIN_INTERVAL = 0.01  # Explicit fast option; retain 250 ms default for older firmware.
+    MIN_INTERVAL = 0.001
     BATCH_SIZE = 3  # 16-byte maximum; 40 frames passed the v8.3 USB-error test.
 
     def __init__(self, *args, boards=(), initial_octave=0, **kwargs):
@@ -239,6 +240,61 @@ class PalettePartyKeys(PartyKeys):
         self.routes = self._shifted_routes(self.octaves)
         self.pending_modes = []
         self.full_clear = None
+        self.last_rgb_send = float("-inf")
+        self.rgb_latched = set()
+        self.rgb_cursor = -1
+        self.nonblocking_show = False
+
+    def _send(self, message):
+        # Pace both RGB and palette writes at the selected interval; floor 1 ms.
+        is_rgb = message.type == "sysex" and len(message.data) > 6 and message.data[6] == 0x15
+        deadline = self.last_rgb_send + PartyKeys.MIN_INTERVAL
+        if is_rgb:
+            deadline = max(deadline, self.last_send + PartyKeys.MIN_INTERVAL)
+        while self.now() < deadline:
+            self.sleep(deadline - self.now())
+        super()._send(message)
+        if is_rgb:
+            self.last_rgb_send = self.last_send
+
+    def _batch_keys(self, ordered, changes):
+        if not ordered:
+            return []
+        def latched(key):
+            if not self.boards and not 0 <= key < KEY_COUNT:
+                return False
+            frame = self._rgb_message(key, BLACK)
+            return (*frame.data[2:4], frame.data[-1]) in self.rgb_latched
+        if not isinstance(changes[ordered[0]], ExactRGB) and latched(ordered[0]):
+            if self.nonblocking_show and self.now() < self.last_send + PartyKeys.MIN_INTERVAL:
+                return []
+            return ordered[:1]
+        if isinstance(changes[ordered[0]], ExactRGB):
+            if self.nonblocking_show and self.now() < self.last_send + PartyKeys.MIN_INTERVAL:
+                return []
+            candidates = [key for key in ordered if isinstance(changes[key], ExactRGB)]
+            key = next((key for key in candidates if key > self.rgb_cursor), candidates[0])
+            self.rgb_cursor = key
+            return [key]
+        keys = []
+        for key in ordered[:self.BATCH_SIZE]:
+            if isinstance(changes[key], ExactRGB) or latched(key):
+                break
+            keys.append(key)
+        return keys
+
+    def _priority(self, color):
+        return 2 if isinstance(color, ExactRGB) else super()._priority(color)
+
+    def _rgb_message(self, key, color):
+        note = self.base_note + key
+        if self.boards:
+            channel, address = self.routes[note]
+            lowest = next(low for ch, addr, low in self.boards if (ch, addr) == (channel, address))
+            index = note - lowest - 12 * self.octaves[channel]
+        else:
+            channel, address, index = 0x7f, 0x7f, key
+        return next(rgb_messages({index: tuple(color)}, channel, address))
 
     def replace_boards(self, boards, octaves=None, reinitialize=False):
         """Validate new maps before swapping; never send using removed routes."""
@@ -284,6 +340,8 @@ class PalettePartyKeys(PartyKeys):
         super().clear()
 
     def show(self, notes, force=False):
+        if not force and self.now() < self.last_rgb_send + PartyKeys.MIN_INTERVAL:
+            return  # Keep reading MIDI while the next RGB frame is not due.
         if self.pending_modes:
             if self.now() < self.last_send + self.min_interval:
                 return
@@ -307,7 +365,14 @@ class PalettePartyKeys(PartyKeys):
             else:
                 self._clear_batch()
             return
-        super().show(notes, force)
+        if not self.boards:
+            notes = {n: rgb for n, rgb in notes.items()
+                     if not isinstance(rgb, ExactRGB) or self.base_note <= n < self.base_note + KEY_COUNT}
+        self.nonblocking_show = not force
+        try:
+            super().show(notes, force)
+        finally:
+            self.nonblocking_show = False
 
     def _shifted_routes(self, octaves):
         routes = {}
@@ -353,6 +418,29 @@ class PalettePartyKeys(PartyKeys):
         batch = {}
         destination = None
         for key, rgb in changes.items():
+            frame = self._rgb_message(key, BLACK) if self.boards or 0 <= key < KEY_COUNT else None
+            physical = (*frame.data[2:4], frame.data[-1]) if frame else None
+            if isinstance(rgb, ExactRGB):
+                if batch:
+                    super()._write_changes(batch)
+                    batch = {}
+                self._send(self._rgb_message(key, rgb))
+                self.state[key] = rgb
+                if any(rgb):
+                    self.rgb_latched.add(physical)
+                else:
+                    self.rgb_latched.discard(physical)
+                LOG.debug("Practice RGB: MIDI %d, frame %s", self.base_note + key, self._rgb_message(key, rgb).hex())
+                continue
+            if physical in self.rgb_latched:
+                if batch:
+                    super()._write_changes(batch)
+                    batch = {}
+                self._send(frame)
+                self.rgb_latched.discard(physical)
+                if self.nonblocking_show:
+                    self.state.pop(key, None)  # Finish the palette write on a later tick.
+                    continue
             route = self.routes.get(self.base_note + key, (0x7f, 0x7f))
             if batch and (route != destination or len(batch) == self.BATCH_SIZE):
                 super()._write_changes(batch)
@@ -363,6 +451,8 @@ class PalettePartyKeys(PartyKeys):
             super()._write_changes(batch)
 
     def _color(self, rgb):
+        if isinstance(rgb, ExactRGB):
+            return rgb
         if not any(rgb):
             return BLACK
         peak = max(rgb)
@@ -404,7 +494,7 @@ def make_driver(port, args, **clock):
     boards = getattr(args, "board", ())
     if boards and cls is not PalettePartyKeys:
         raise ValueError("--board requires --protocol palette71")
-    interval = getattr(args, "palette_interval_ms", 250) / 1000 if cls is PalettePartyKeys else cls.DEFAULT_INTERVAL
+    interval = getattr(args, "palette_interval_ms", 1) / 1000 if cls is PalettePartyKeys else cls.DEFAULT_INTERVAL
     options = {"boards": boards, "initial_octave": getattr(args, "initial_octave", 0)} if cls is PalettePartyKeys else {}
     return cls(port, args.brightness, args.base_note, min_interval=interval, **options, **clock)
 
