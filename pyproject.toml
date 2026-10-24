@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "partykeys-bridge"
-version = "0.1.5"
+version = "0.1.6"
 description = "Synthesia key lights and independent timed MIDI preview for PartyKeys 36"
 readme = "README.md"
 license = {file = "LICENSE"}

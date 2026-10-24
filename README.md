@@ -6,7 +6,7 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
 ## Get started
 
-1. **Download the app** from [Executables → the latest successful run → Artifacts](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml). Choose your computer's download, then extract the app ZIP inside it. GitHub requires sign-in to download these builds.
+1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip).
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
 3. Open the launcher for your platform:
 
@@ -19,8 +19,6 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
 **No Python installation is needed for packaged downloads.** The GUI starts the bridge itself; you do not need to run the console launcher alongside it. Close the window to stop its bridge and clear the lights.
 
-> The latest release, **v0.1.5**, predates the GUI. Use the current Actions build above for the GUI; the release downloads below still provide the older console app. If your folder has no **Practice lights** launcher, download a GUI build.
-
 The GUI gives you:
 
 - Independent colours for each practice key, with eight presets and a custom colour picker.
@@ -31,13 +29,13 @@ The GUI gives you:
 
 For terminal workflows, **Start Synthesia bridge.cmd/.command** and `partykeys bridge` remain available. From a source install, use `partykeys gui` or `python -m partykeys_bridge gui` to open the window.
 
-## Release downloads
+## Downloads
 
 [![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-arm64.zip)
 [![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip)
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip)
 
-These links download the latest published release. To get the desktop window and its practice controls, use the [current app build](#get-started) until a release containing it is published.
+Each download includes the desktop app, **Practice lights** launcher, console launcher, setup guide and license notices. No GitHub sign-in is needed.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
