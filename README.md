@@ -1,16 +1,16 @@
 # Synthesia → PartyKeys bridge
 
-Control PartyKeys lights from a small desktop window on Windows or macOS. **The GUI is the recommended way to start:** it runs the Synthesia bridge and adds per-key practice colours, keyboard painting, brightness controls and fading trails. Practice lights can be used on their own, and Synthesia cues take priority when you play a song. Joined PartyKeys boards are supported.
+![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
 
-![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
+Light your PartyKeys keyboard from Synthesia, choose practice colours for individual keys, and add fading trails. Open the desktop app on Windows or macOS to control the lights. Practice colours work on their own, and Synthesia cues take priority during a song. Joined PartyKeys boards are supported.
 
-## Start with the GUI (recommended)
+## Get started
 
-1. **Download a current GUI build** from [Executables → the latest successful run → Artifacts](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml). Choose the artifact for your computer, then extract the app ZIP inside it. GitHub requires sign-in to download Actions artifacts.
+1. **Download the app** from [Executables → the latest successful run → Artifacts](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml). Choose your computer's download, then extract the app ZIP inside it. GitHub requires sign-in to download these builds.
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
 3. Open the launcher for your platform:
 
-   | Platform | Recommended launcher |
+   | Platform | Open this file |
    | --- | --- |
    | Windows | **Practice lights.cmd** |
    | macOS, Apple Silicon or Intel | **Practice lights.command** |
@@ -37,7 +37,7 @@ For terminal workflows, **Start Synthesia bridge.cmd/.command** and `partykeys b
 [![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip)
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip)
 
-These links download the latest published release. For the recommended GUI, use the [current GUI build](#start-with-the-gui-recommended) until a release containing it is published.
+These links download the latest published release. To get the desktop window and its practice controls, use the [current app build](#get-started) until a release containing it is published.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
@@ -52,6 +52,8 @@ Not sure which Mac download to choose? Open **Apple menu → About This Mac**: �
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
 ## Using the GUI
+
+![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
 
 Choose one of the eight preset colours or use **Practice colour** for a custom
 colour, then click keys to paint them. Each key keeps its own colour when you
@@ -100,10 +102,6 @@ needs `python3-tk`). Linux uses an existing MIDI input, for example
 macOS and supported Windows installations. CI builds Windows x64, macOS Intel and
 Apple Silicon; native macOS testing is still required for a new UI build.
 
-### Synthesia in action
-
-![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
-
 ## Requirements
 
 - One or more PartyKeys 36 boards with **firmware v9**.
@@ -119,7 +117,7 @@ This is an independent community project, not an official Synthesia or PartyKeys
 
 ## Opening your download
 
-Extract the ZIP before running it. Current GUI builds include the app executable, **Practice lights** and **Start Synthesia bridge** launchers, this guide, and license notices. Prefer **Practice lights** for everyday use. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
+Extract the ZIP before running it, then open **Practice lights**. Current builds include the app executable, both launchers, this guide, and license notices. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
 
 ## Set up Synthesia on macOS
 
@@ -270,7 +268,7 @@ Palette mode (`palette71`, the bridge default) sends up to **three note/color pa
 
 | `--palette-interval-ms` | Maximum packet rate | Use |
 | --- | --- | --- |
-| `10` | 100/second | Recommended for responsive lighting |
+| `10` | 100/second | Optional slower rate |
 | `20` | 50/second | Slower alternative |
 | `40` | 25/second | Slower alternative |
 | `100` | 10/second | Diagnostic option |
