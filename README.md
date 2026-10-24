@@ -1,4 +1,4 @@
-# PartyKeys Lights
+# Synthesia → PartyKeys bridge
 
 ![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
 
@@ -6,7 +6,7 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
 ## Get started
 
-1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip).
+1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip).
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
 3. Open the launcher for your platform:
 
@@ -31,21 +31,21 @@ The console launcher remains available for terminal use.
 
 ## Downloads
 
-[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip)
-[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip)
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip)
+[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip)
+[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip)
 
 Each download includes the desktop app, **Practice lights** launcher, console launcher, setup guide and license notices. No GitHub sign-in is needed.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
-| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
+| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/partykeys-lights-v0.1.6-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
 
 Not sure which Mac download to choose? Open **Apple menu → About This Mac**: “Chip: Apple M…” means Apple Silicon; “Processor: Intel…” means Intel.
 
-[Release notes and all downloads](https://github.com/teaqu/partykeys-lights/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/partykeys-lights/releases/download/v0.1.6/SHA256SUMS-v0.1.6.txt)
+[Release notes and all downloads](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.6/SHA256SUMS-v0.1.6.txt)
 
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
@@ -175,7 +175,7 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 
 ## Development
 
-The [Executables workflow](https://github.com/teaqu/partykeys-lights/actions/workflows/executables.yml) builds Windows x64, macOS Apple Silicon, and macOS Intel downloads on native runners. Each build runs the test suite and checks the packaged executable: help, MIDI port enumeration, MIDI-file inspection, dry-run lighting, preview controls, and a real Tk GUI launch. The GUI check runs on native Windows, Intel Mac and Apple Silicon runners, exercises painting/erasing and trail controls, saves settings in a temporary folder, and closes the window without opening MIDI ports. Every push to `main`, pull request, or manual workflow run produces ZIPs and SHA-256 checksums. Releases provide stable downloads of selected builds.
+The [Executables workflow](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml) builds Windows x64, macOS Apple Silicon, and macOS Intel downloads on native runners. Each build runs the test suite and checks the packaged executable: help, MIDI port enumeration, MIDI-file inspection, dry-run lighting, preview controls, and a real Tk GUI launch. The GUI check runs on native Windows, Intel Mac and Apple Silicon runners, exercises painting/erasing and trail controls, saves settings in a temporary folder, and closes the window without opening MIDI ports. Every push to `main`, pull request, or manual workflow run produces ZIPs and SHA-256 checksums. Releases provide stable downloads of selected builds.
 
 ```sh
 python -m unittest discover -s tests -v
@@ -208,8 +208,8 @@ Python 3.10 or newer with Tk is required for source installs. The UI uses Python
 ### Install from source on macOS
 
 ```sh
-git clone https://github.com/teaqu/partykeys-lights.git
-cd partykeys-lights
+git clone https://github.com/teaqu/synthesia-partykeys-bridge.git
+cd synthesia-partykeys-bridge
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
