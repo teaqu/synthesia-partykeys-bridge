@@ -1,16 +1,43 @@
 # Synthesia → PartyKeys bridge
 
-![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
+Control PartyKeys lights from a small desktop window on Windows or macOS. **The GUI is the recommended way to start:** it runs the Synthesia bridge and adds per-key practice colours, keyboard painting, brightness controls and fading trails. Practice lights can be used on their own, and Synthesia cues take priority when you play a song. Joined PartyKeys boards are supported.
 
-Light PartyKeys keyboards, including multiple boards joined together, from Synthesia on macOS or Windows using a virtual MIDI cable. Left-hand cues light blue and right-hand cues light green; keys return to dark when neither is active, including notes you miss.
+![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
 
-## Download and start
+## Start with the GUI (recommended)
+
+1. **Download a current GUI build** from [Executables → the latest successful run → Artifacts](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml). Choose the artifact for your computer, then extract the app ZIP inside it. GitHub requires sign-in to download Actions artifacts.
+2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
+3. Open the launcher for your platform:
+
+   | Platform | Recommended launcher |
+   | --- | --- |
+   | Windows | **Practice lights.cmd** |
+   | macOS, Apple Silicon or Intel | **Practice lights.command** |
+
+4. Keep the window open. For practice lights, choose a colour and click keys, or enable **Press keyboard keys to paint / erase** and play them. For Synthesia, follow the [Mac setup](#set-up-synthesia-on-macos) or [Windows setup](#set-up-on-windows) once, then start a song.
+
+**No Python installation is needed for packaged downloads.** The GUI starts the bridge itself; you do not need to run the console launcher alongside it. Close the window to stop its bridge and clear the lights.
+
+> The latest release, **v0.1.5**, predates the GUI. Use the current Actions build above for the GUI; the release downloads below still provide the older console app. If your folder has no **Practice lights** launcher, download a GUI build.
+
+The GUI gives you:
+
+- Independent colours for each practice key, with eight presets and a custom colour picker.
+- Physical keyboard painting and erasing, plus saved practice selections and brightness.
+- Synthesia left- and right-hand colour controls.
+- Trail mode with immediate fading, adjustable duration and a separate maximum brightness.
+- Start/stop controls and live settings changes, with 1 ms LED pacing by default.
+
+For terminal workflows, **Start Synthesia bridge.cmd/.command** and `partykeys bridge` remain available. From a source install, use `partykeys gui` or `python -m partykeys_bridge gui` to open the window.
+
+## Release downloads
 
 [![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-arm64.zip)
 [![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-macos-x64.zip)
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest/download/partykeys-windows-x64.zip)
 
-**Download the ZIP, extract it, then double-click the “Start Synthesia bridge” launcher. No Python installation needed.**
+These links download the latest published release. For the recommended GUI, use the [current GUI build](#start-with-the-gui-recommended) until a release containing it is published.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
@@ -24,26 +51,81 @@ Not sure which Mac download to choose? Open **Apple menu → About This Mac**: �
 
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
+## Using the GUI
+
+Choose one of the eight preset colours or use **Practice colour** for a custom
+colour, then click keys to paint them. Each key keeps its own colour when you
+change the brush. Choose **Erase** to remove individual keys. Brightness applies
+to all practice keys. Enable **Press keyboard keys to paint / erase** to assign
+the current colour by playing your physical keyboard; turn this off for normal
+practice. Releasing a key does not erase its saved practice colour.
+
+Enable **Trail mode** to fade Synthesia cues after note release, with a duration
+from 0.25 to 30 seconds. **Trail max brightness** caps the released trail (35%
+by default) independently of practice brightness and held cues. On release it
+immediately drops to that cap and visibly fades during the first 120 ms, even
+with a long duration; the remaining tail then fades to zero over the selected
+duration. Held cues stay bright and repeated notes light fully
+again. Saved practice colours remain underneath trails. Song stop/reset clears
+trails immediately. RGB updates are paced by the keyboard protocol, so large
+chords can fade in visible steps rather than smoothly.
+
+Click white or black keys to select the exact pitches to keep lit. Scroll to other
+octaves, choose **Practice colour**, and adjust **Brightness** (8% by default).
+Uncheck **Keep selected keys lit** to disable the background without losing your
+selection. **Clear selection** removes all selected notes. Changes save automatically
+to `config.json`; GUI changes apply immediately while the bridge runs.
+The `live_reload` setting controls edits made to the file outside the GUI.
+Only pitches available on the connected boards light up; labels use C4 = MIDI 60.
+
+Synthesia continues to use **Music Output → Synthesia Lights → Key Lights →
+Finger-based channel**. Its hand cues override practice lights; releasing a cue
+restores the faint colour. Resetting or stopping a song keeps your practice
+selection. Closing the window stops its bridge, clears LEDs and releases ports.
+The **Left hand…** and **Right hand…** buttons change Synthesia cue colours
+(the fast palette protocol uses the closest supported hue).
+
+Dim practice lights use per-key RGB15 commands alongside the existing fast
+palette cues. RGB and palette writes default to 1 ms pacing. Live GUI changes
+and keyboard painting go straight to the MIDI worker rather than waiting for
+configuration-file reload. Unchanged practice lights send no extra traffic.
+Joined-board RGB addressing and mixed RGB/palette operation require checking on
+your keyboard firmware; automated tests verify message layout, routing and pacing.
+
+The UI uses Python's cross-platform Tk toolkit without browser or web-server
+dependencies. Windows and macOS packages bundle it with the executable. For source
+installs, use Python with Tk support (`python -m tkinter` to check; Linux commonly
+needs `python3-tk`). Linux uses an existing MIDI input, for example
+`partykeys gui --input "Your MIDI bus"`; automatic virtual inputs are available on
+macOS and supported Windows installations. CI builds Windows x64, macOS Intel and
+Apple Silicon; native macOS testing is still required for a new UI build.
+
+### Synthesia in action
+
+![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
+
 ## Requirements
 
 - One or more PartyKeys 36 boards with **firmware v9**.
-- macOS or 64-bit Windows, Synthesia, and a USB data connection to the keyboard.
+- macOS or 64-bit Windows and a USB data connection to the keyboard. Synthesia is only needed for song cues; standalone practice lighting works without it.
 - Python 3.10 or newer for source installs. The executable downloads include Python.
 - A virtual MIDI connection: created automatically by the Mac launcher or the experimental Windows 11 25H2+ launcher. Older Windows configurations can use loopMIDI.
 
 Use [PartyKeys Hub](https://apps.apple.com/app/id6797699163) to update your keyboard. The update requires the keyboard to connect to Wi-Fi. Check the **keyboard firmware version**, which is separate from the Hub app version.
 
-Only **macOS has been tested with a physical keyboard so far**. Windows builds are available, but keyboard operation on Windows has not yet been tested.
+The GUI has been checked on Windows. Earlier console bridge builds were tested on macOS; the new macOS GUI still needs native validation.
 
 This is an independent community project, not an official Synthesia or PartyKeys integration.
 
 ## Opening your download
 
-Extract the ZIP before running it. Each download includes a command-line executable, a launcher, this guide, and license notices. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
+Extract the ZIP before running it. Current GUI builds include the app executable, **Practice lights** and **Start Synthesia bridge** launchers, this guide, and license notices. Prefer **Practice lights** for everyday use. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
 
 ## Set up Synthesia on macOS
 
-1. Double-click **Start Synthesia bridge.command** in the extracted Mac download. It creates a MIDI destination named **Synthesia Lights** automatically. Leave the terminal open.
+1. Double-click **Practice lights.command** in the extracted Mac GUI build and keep the window open. It starts the bridge and creates a MIDI destination named **Synthesia Lights** automatically. **Start Synthesia bridge.command** is the console-only alternative.
+
+   The folder screenshot below shows the older console launcher; choose **Practice lights.command** in current GUI builds.
 
    ![The extracted Mac download with Start Synthesia bridge.command selected](docs/images/mac-launcher.jpg)
 
@@ -75,7 +157,7 @@ For custom settings, open Terminal in the extracted folder and run:
   --palette-interval-ms 10
 ```
 
-Start a song in Synthesia. Press **Ctrl+C** in the terminal to clear the lights and exit.
+Start a song in Synthesia. Close the GUI window to clear the lights and exit. When using the console alternative, press **Ctrl+C** in its terminal.
 
 Port names can be exact names or unambiguous substrings. Use `./partykeys ports` to see your names. Once selected, automatic reconnection stays restricted to those exact names.
 
@@ -87,10 +169,10 @@ For source installs, use `partykeys` instead of `./partykeys`. Elsewhere in this
 
 This experimental Windows build bundles Microsoft Windows MIDI Services Preview 11. Automatic setup requires **Windows 11 25H2 or newer** and a working Windows MIDI service. It does not install drivers or edit the system MIDI configuration. No separate .NET or loopMIDI installation is needed on supported systems.
 
-1. Extract the **entire ZIP**, keeping `native-midi-helper` beside `partykeys.exe`. Double-click **Start Synthesia bridge.cmd** and leave it running.
+1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside `partykeys.exe`. Double-click **Practice lights.cmd** and keep the window open. **Start Synthesia bridge.cmd** is the console-only alternative.
 2. Open Synthesia → Settings → Music Devices. Use **PartyKeys** for Music Input and disable PartyKeys under Music Output. Keep the built-in synthesizer enabled for sound.
 3. Select **Synthesia Lights** under Music Output and enable sending to it. Disable My Notes, Background Instruments, Percussion, and Metronome on that output. Select **Key Lights → Finger-based channel**.
-4. Start a song. Press Ctrl+C in the bridge console to clear the lights and remove its temporary MIDI ports.
+4. Start a song. Close the GUI window to clear the lights and remove its temporary MIDI ports. For the console alternative, press Ctrl+C in its terminal.
 
 **Music Devices:** enable PartyKeys as input, keep the built-in synthesizer for sound, and use Synthesia Lights only for key lights.
 
@@ -114,7 +196,7 @@ For older Windows versions, or when using loopMIDI instead of the native MIDI AP
 
 1. Install and open [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html).
 2. On **Setup**, enter **Synthesia Lights** in **New port-name**, then click **+** at the bottom left. The new port appears in the list, as shown below.
-3. Leave loopMIDI running, then start **Start Synthesia bridge.cmd**. Keep `midi.input` in `config.json` set to `Synthesia Lights`; the bridge reuses that port without starting its native MIDI helper. You can also set `midi.create_virtual_input` to `false` to explicitly use the existing port.
+3. Leave loopMIDI running, then open **Practice lights.cmd** (or **Start Synthesia bridge.cmd** for console use). Keep `midi.input` in `config.json` set to `Synthesia Lights`; the bridge reuses that port without starting its native MIDI helper. You can also set `midi.create_virtual_input` to `false` to explicitly use the existing port.
 4. In Synthesia, select **Synthesia Lights** under **Music Output**, enable sending, leave ordinary notes off, and choose **Key Lights → Finger-based channel**, as shown in the Windows screenshots above. Keep **PartyKeys** as Music Input and its Music Output off.
 
 ![loopMIDI with the created Synthesia Lights port, received MIDI data and active throughput](docs/images/windows-loopmidi-port-created.png)
@@ -144,17 +226,19 @@ See `WINDOWS-MIDI-PREVIEW.txt` in the Windows download for preview details. Micr
 
 ## JSON settings and palette
 
+Use the GUI for everyday colour, brightness, practice-key and trail changes. This section covers advanced routing and manual configuration.
+
 The bridge uses Synthesia's live finger-based light cues. It does not read the song MIDI file, estimate playback speed, or retain lights for inferred note durations. Keep **My Notes** disabled on the Synthesia Lights output so ordinary score messages are not mixed with the light cues.
 
 With automatic discovery (no explicit `--board` options), the bridge discovers connected boards and detects boards added or removed during use. It reads the physical MIDI input for topology and octave reports. Discovery at connection takes about three seconds; subsequent topology queries are nonblocking. Removed boards are excluded, and newly connected boards are initialized and cleared before current cues are restored. Explicit manual board maps remain fixed.
 
 All mapped keys are explicitly cleared on connection, MIDI Stop/Reset, Synthesia's channel-1 CC16 reset, and all-notes/all-sounds-off messages. These clears bypass cached LED state and use paced per-key off packets. Waiting for a note does not trigger a silence timeout. A menu or pause action that sends no MIDI reset cannot be distinguished from waiting using silence alone.
 
-The Windows launcher reads **config.json** beside `partykeys.exe`. Edit it with a text editor and save. Colour/palette changes apply while the bridge runs, normally within half a second, including to notes already lit. Invalid or incomplete JSON edits are ignored until corrected; the last valid settings remain active.
+Both platform launchers read **config.json** beside the executable. Edit it with a text editor and save. Colour/palette changes apply while the bridge runs, normally within half a second, including to notes already lit. Invalid or incomplete JSON edits are ignored until corrected; the last valid settings remain active.
 
 - `palette` gives names to six-digit RGB values. For example, `"purple": "B400FF"`.
 - `lighting.left_color` and `lighting.right_color` accept a palette name or a six-digit RGB value. Defaults are left blue and right green.
-- `lighting.rgb_brightness`: 0 to 1, only for the slower `rgb15` protocol. It does not scale palette brightness.
+- `lighting.rgb_brightness`: 0 to 1, only for the `rgb15` protocol. It does not scale palette brightness.
 - `midi.create_virtual_input`, `midi.input`, and `midi.palette_interval_ms` control automatic port creation, cue-port name, and packet pacing. Changes to the `midi` section require a bridge restart.
 - `live_reload`: set to `false` to disable live config updates. Restart after re-enabling it. `poll_interval_ms` controls how often the config is checked (100–10000 ms).
 
@@ -317,58 +401,3 @@ This project is licensed under the [MIT License](LICENSE). Bundled dependencies 
 Install a .NET 10 SDK on the build machine, then run `python scripts/build_windows_helper.py`. The script downloads the pinned Microsoft API package, verifies its SHA-256, and publishes a self-contained helper into `native-midi-helper`. Keep this folder beside the source checkout or packaged executable. The build uses Windows API metadata from `C:\Windows\System32\WinMetadata`.
 
 On a supported Windows 11 PC, run `python tests/windows_midi_smoke.py` to test real native API creation, WinMM delivery, bridge LED state, hidden-receiver behavior, duplicate-instance rejection, and port removal. This test opens only its temporary virtual MIDI endpoints and disables physical keyboard output. It is not run on Windows Server CI runners, which lack the required consumer Windows service.
-
-## Practice lights window
-
-![Practice lights with independently coloured C4, E4 and G4 keys and Trail mode controls](docs/images/practice-lights-window.png)
-
-Choose one of the eight preset colours or use **Practice colour** for a custom
-colour, then click keys to paint them. Each key keeps its own colour when you
-change the brush. Choose **Erase** to remove individual keys. Brightness applies
-to all practice keys. Enable **Press keyboard keys to paint / erase** to assign
-the current colour by playing your physical keyboard; turn this off for normal
-practice. Releasing a key does not erase its saved practice colour.
-
-Enable **Trail mode** to fade Synthesia cues after note release, with a duration
-from 0.25 to 30 seconds. **Trail max brightness** caps the released trail (35%
-by default) independently of practice brightness and held cues. On release it
-immediately drops to that cap and visibly fades during the first 120 ms, even
-with a long duration; the remaining tail then fades to zero over the selected
-duration. Held cues stay bright and repeated notes light fully
-again. Saved practice colours remain underneath trails. Song stop/reset clears
-trails immediately. RGB updates are paced by the keyboard protocol, so large
-chords can fade in visible steps rather than smoothly.
-
-Open **Practice lights.cmd** on Windows or **Practice lights.command** on macOS
-from the extracted download. This starts a small piano window and the Synthesia
-bridge together. Stop any older bridge instance first. You can also run
-`partykeys gui` (or `python -m partykeys_bridge gui` from source).
-
-Click white or black keys to select the exact pitches to keep lit. Scroll to other
-octaves, choose **Practice colour**, and adjust **Brightness** (8% by default).
-Uncheck **Keep selected keys lit** to disable the background without losing your
-selection. **Clear selection** removes all selected notes. Changes save automatically
-to `config.json` and apply while the bridge runs when `live_reload` is enabled.
-Only pitches available on the connected boards light up; labels use C4 = MIDI 60.
-
-Synthesia continues to use **Music Output → Synthesia Lights → Key Lights →
-Finger-based channel**. Its hand cues override practice lights; releasing a cue
-restores the faint colour. Resetting or stopping a song keeps your practice
-selection. Closing the window stops its bridge, clears LEDs and releases ports.
-The **Left hand…** and **Right hand…** buttons change Synthesia cue colours
-(the fast palette protocol uses the closest supported hue).
-
-Dim practice lights use per-key RGB15 commands alongside the existing fast
-palette cues. RGB and palette writes default to 1 ms pacing. Live GUI changes
-and keyboard painting go straight to the MIDI worker rather than waiting for
-configuration-file reload. Unchanged practice lights send no extra traffic.
-Joined-board RGB addressing and mixed RGB/palette operation require checking on
-your keyboard firmware; automated tests verify message layout, routing and pacing.
-
-The UI uses Python's cross-platform Tk toolkit without browser or web-server
-dependencies. Windows and macOS packages bundle it with the executable. For source
-installs, use Python with Tk support (`python -m tkinter` to check; Linux commonly
-needs `python3-tk`). Linux uses an existing MIDI input, for example
-`partykeys gui --input "Your MIDI bus"`; automatic virtual inputs are available on
-macOS and supported Windows installations. CI builds Windows x64, macOS Intel and
-Apple Silicon; native macOS testing is still required for a new UI build.
