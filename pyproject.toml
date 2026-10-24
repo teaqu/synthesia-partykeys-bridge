@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "partykeys-bridge"
 version = "0.1.6"
-description = "Synthesia key lights and independent timed MIDI preview for PartyKeys 36"
+description = "Practice lights, fading trails, and Synthesia integration for PartyKeys"
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
