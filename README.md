@@ -121,10 +121,6 @@ Extract the ZIP before running it, then open **Practice lights**. Current builds
 
 1. Double-click **Practice lights.command** in the extracted Mac GUI build and keep the window open. It starts the bridge and creates a MIDI destination named **Synthesia Lights** automatically. **Start Synthesia bridge.command** is the console-only alternative.
 
-   The folder screenshot below shows the older console launcher; choose **Practice lights.command** in current GUI builds.
-
-   ![The extracted Mac download with Start Synthesia bridge.command selected](docs/images/mac-launcher.jpg)
-
 2. Open **Synthesia → Settings → Music Devices**. Enable **PartyKeys** under **Music Input** and disable **PartyKeys** under **Music Output**. Keep **Built-in MIDI Synthesizer** enabled for sound, then select **Synthesia Lights** under **Music Output**.
 
    ![Synthesia Music Devices with PartyKeys input enabled, direct PartyKeys output off, and Synthesia Lights configured for key lights](docs/images/synthesia-music-devices.jpg)
