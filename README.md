@@ -164,7 +164,7 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 
 ## Troubleshooting
 
-- **Wrong keys light up or the lights are shifted:** stop the app and disconnect MIDI. Return the keyboard to its default octave before reconnecting MIDI, then open the app again.
+- **Wrong keys, shifted lights or a missing second keyboard:** stop the app and unplug the MIDI/USB cable. Return the keyboard to its default octave before plugging the cable back in. If a second keyboard is joined, detach it and attach it again too, then restart the app.
 - **No practice lights:** turn on **Keep selected keys lit**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
 - **Playing keys does not assign colours:** enable **Press keyboard keys to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
