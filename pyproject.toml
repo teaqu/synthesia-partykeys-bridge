@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "partykeys-bridge"
-version = "0.1.7"
+version = "0.1.8"
 description = "Practice lights, fading trails, and Synthesia integration for PartyKeys"
 readme = "README.md"
 license = {file = "LICENSE"}
