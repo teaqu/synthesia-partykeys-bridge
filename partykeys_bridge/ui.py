@@ -137,7 +137,7 @@ class Window:
         title_row = ttk.Frame(frame)
         title_row.pack(fill="x")
         ttk.Label(title_row, text="Practice lights", font=("", 18, "bold")).pack(side="left")
-        ttk.Label(title_row, text="✓ Selected · sunken = pressed").pack(side="right")
+        ttk.Label(title_row, text="Sunken keys are pressed").pack(side="right")
         ttk.Label(frame, text="Choose Paint or Erase, then click keys. Right-click does the opposite. Synthesia cues appear over practice lights.",
                   wraplength=700).pack(anchor="w", pady=(4, 14))
         row = ttk.Frame(frame)
@@ -179,7 +179,6 @@ class Window:
         self.canvas.configure(xscrollcommand=scroll.set)
         self.keys = {}
         self.key_labels = {}
-        self.selection_marks = {}
         self.held_marks = {}
         self.draw_keyboard()
         self.canvas.bind("<Button-1>", self.click)
@@ -264,10 +263,6 @@ class Window:
 
     def draw_key_marks(self, note, x, width, height):
         tags = (f"note:{note}",)
-        middle, y = x + width / 2, height - 32
-        self.selection_marks[note] = self.canvas.create_line(
-            middle - 4, y, middle - 1, y + 3, middle + 5, y - 4,
-            width=2, state="hidden", tags=tags)
         # Inset shadows and a lower face make a held key look physically down.
         self.held_marks[note] = (
             self.canvas.create_rectangle(x + 1, 0, x + width - 1, 7,
@@ -367,10 +362,6 @@ class Window:
             if note in self.key_labels:
                 self.canvas.itemconfigure(self.key_labels[note], fill=foreground)
                 self.canvas.coords(self.key_labels[note], (x1 + x2) / 2, height - 16 + (3 if down else 0))
-            self.canvas.itemconfigure(self.selection_marks[note], fill=foreground,
-                                      state="normal" if selected else "hidden")
-            middle, y = (x1 + x2) / 2, height - 32 + (3 if down else 0)
-            self.canvas.coords(self.selection_marks[note], middle - 4, y, middle - 1, y + 3, middle + 5, y - 4)
             shadow = "#" + "".join(f"{round(c * .35):02X}" for c in rgb)
             edge = "#" + "".join(f"{round(c + (255 - c) * .35):02X}" for c in rgb)
             self.canvas.itemconfigure(self.held_marks[note][0], fill=shadow)
@@ -665,7 +656,6 @@ def smoke_test(args):
                 assert window.canvas.itemcget(window.keys[60], "fill") == "#003AB8", "Pressed key did not shade its saved colour"
                 assert window.canvas.coords(window.keys[60])[1] == 4, "Pressed key face did not sink"
                 assert window.canvas.coords(window.key_labels[60])[1] == 117, "Pressed key label did not move down"
-                assert window.canvas.itemcget(window.selection_marks[60], "state") == "normal", "Selected key has no check mark"
                 assert window.canvas.itemcget(window.held_marks[61][1], "state") == "normal", "Black pressed key has no inset shadow"
                 window.bridge_enable_toggle.invoke()
                 assert not window.bridge_enabled.get(), "Bridge lights did not disable"
