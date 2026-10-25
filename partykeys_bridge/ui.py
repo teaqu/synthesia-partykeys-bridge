@@ -709,13 +709,22 @@ def smoke_test(args):
             except Exception as error:
                 fail(error)
 
-        def exercise():
+        def check_status_layout(deadline):
+            label_fits = window.status_label.winfo_height() >= window.status_label.winfo_reqheight()
+            footer_fits = window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height()
+            if label_fits and footer_fits:
+                window.status.set("Ready")
+                exercise()
+            elif time.monotonic() < deadline:
+                # Windows applies native WM resize messages on a later event
+                # turn; idle-only processing is insufficient to observe it.
+                root.after(25, lambda: check_status_layout(deadline))
+            else:
+                fail(f"Multiline status layout did not fit: label {window.status_label.winfo_height()}/{window.status_label.winfo_reqheight()}, "
+                     f"footer {footer_fits}, geometry {root.geometry()}")
+
+        def exercise_logs_and_layout():
             try:
-                assert root.winfo_viewable(), "GUI window did not become visible"
-                assert window.canvas.winfo_width() > 100, "Keyboard canvas was not laid out"
-                assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
-                assert window.bridge_scale.winfo_ismapped(), "Bridge brightness control was not laid out"
-                assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Brightness row clipped the window footer"
                 window.log_handler.handle(logging.LogRecord("partykeys", logging.INFO, __file__, 0, "Smoke log entry", (), None))
                 window.log_button.invoke()
                 assert "INFO: Smoke log entry" in window.log_text.get("1.0", "end"), "Logs did not show earlier output"
@@ -727,10 +736,17 @@ def smoke_test(args):
                 assert "Smoke log entry" in window.log_text.get("1.0", "end"), "Closing logs lost history"
                 window.close_logs()
                 window.status.set("First status line\nSecond status line\n" + "Long wrapped connection detail. " * 8)
-                root.update_idletasks()
-                assert window.status_label.winfo_height() >= window.status_label.winfo_reqheight(), "Multiline status text was clipped"
-                assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Multiline status clipped the footer"
-                window.status.set("Ready")
+                root.after(25, lambda: check_status_layout(time.monotonic() + 2))
+            except Exception as error:
+                fail(error)
+
+        def exercise():
+            try:
+                assert root.winfo_viewable(), "GUI window did not become visible"
+                assert window.canvas.winfo_width() > 100, "Keyboard canvas was not laid out"
+                assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
+                assert window.bridge_scale.winfo_ismapped(), "Bridge brightness control was not laid out"
+                assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Brightness row clipped the window footer"
                 assert window.swatch.winfo_ismapped(), "Custom colour button was not laid out"
                 for button in window.presets.values():
                     assert button.winfo_ismapped(), "Preset colour button was not laid out"
@@ -847,7 +863,7 @@ def smoke_test(args):
             except Exception as error:
                 fail(error)
 
-        root.after(150, exercise)
+        root.after(150, exercise_logs_and_layout)
         root.after(10000, lambda: fail("GUI smoke test did not close within 10 seconds"))
         try:
             root.mainloop()
