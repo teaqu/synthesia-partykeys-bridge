@@ -311,6 +311,8 @@ def execute(args):
     bridge = preview = song = None
     if args.command == "bridge":
         bridge = Bridge(args.left_color, args.right_color, args.left_channels, args.right_channels)
+        bridge.set_brightness(getattr(args, "bridge_brightness", 1.0))
+        bridge.enabled = getattr(args, "bridge_enabled", True)
         bridge.set_practice(getattr(args, "practice", settings.DEFAULTS["practice"]))
         bridge.set_trail(getattr(args, "trail", settings.DEFAULTS["trail"]))
         BridgeConnection(args, bridge, PrintPort(), config_watcher=getattr(args, "config_watcher", None)).run()

@@ -14,7 +14,9 @@
   "lighting": {
     "left_color": "blue",
     "right_color": "green",
-    "rgb_brightness": 1.0
+    "rgb_brightness": 1.0,
+    "bridge_brightness": 1.0,
+    "bridge_enabled": true
   },
   "practice": {
     "enabled": false,

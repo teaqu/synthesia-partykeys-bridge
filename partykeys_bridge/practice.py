@@ -10,10 +10,10 @@ class LiveLighting:
         self.generation = 0
         self.value = None
 
-    def publish(self, practice, trail, erase=False):
+    def publish(self, practice, trail, erase=False, bridge_brightness=1.0, bridge_enabled=True):
         with self.lock:
             self.generation += 1
-            self.value = (deepcopy(practice), dict(trail), erase)
+            self.value = (deepcopy(practice), dict(trail), erase, bridge_brightness, bridge_enabled)
 
     def snapshot(self):
         with self.lock:
@@ -59,6 +59,19 @@ def capture_key(args, message):
         args.practice_key_events.put(message.note)
         return message.note
     return None
+
+
+def physical_key_event(args, message=None):
+    """Notify the GUI of physical key state independently of paint capture.
+
+    None means the input disconnected. Only the GUI consumes this stream;
+    it must never change practice colours or send MIDI output.
+    """
+    events = getattr(args, "physical_key_events", None)
+    if events is not None and (message is None or message.type in (
+            "note_on", "note_off", "reset", "stop") or
+            (message.type == "control_change" and message.control in (120, 123))):
+        events.put(message.copy() if message is not None else None)
 
 
 def note_name(note):

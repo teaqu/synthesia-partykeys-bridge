@@ -1,5 +1,7 @@
 import unittest
 from unittest.mock import patch
+from copy import deepcopy
+import queue
 
 import mido
 import rtmidi
@@ -30,6 +32,41 @@ class Device:
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_live_bridge_brightness_changes_an_existing_cue_without_config_io(self):
+        from partykeys_bridge.practice import LiveLighting
+        live = self.session.args.live_lighting = LiveLighting()
+        self.session.bridge.receive(mido.Message("note_on", channel=1, note=60))
+        live.publish(self.session.bridge.practice, self.session.bridge.trail, bridge_brightness=.25)
+        self.step()
+        self.assertEqual(self.session.bridge.brightness, .25)
+        self.assertEqual(self.session.bridge.lights()[60], (64, 64, 0))
+        live.publish(self.session.bridge.practice, self.session.bridge.trail,
+                     bridge_brightness=.25, bridge_enabled=False)
+        self.session.tick()
+        self.assertFalse(self.session.bridge.lights())
+        live.publish(self.session.bridge.practice, self.session.bridge.trail, bridge_brightness=.25)
+        self.session.tick()
+        self.assertEqual(self.session.bridge.lights()[60], (64, 64, 0))
+
+    def test_gui_receives_physical_keys_without_paint_capture_and_clears_on_disconnect(self):
+        events = self.session.args.physical_key_events = queue.SimpleQueue()
+        self.step()
+        practice = deepcopy(self.session.bridge.practice)
+        pressed, cue = self.session.ports["pressed"], self.session.ports["cue"]
+        on = mido.Message("note_on", channel=2, note=60, velocity=80)
+        off = mido.Message("note_on", channel=2, note=60, velocity=0)
+        pressed.pending.extend([on, off])
+        cue.pending.append(mido.Message("note_on", note=72))
+        self.session.tick()
+        self.assertEqual(events.get_nowait(), on)
+        self.assertEqual(events.get_nowait(), off)
+        self.assertTrue(events.empty())  # Synthesia cue notes are not physical presses.
+        self.assertEqual(self.session.bridge.practice, practice)
+        self.session.drop("output")
+        self.assertTrue(events.empty())  # LED reconnects do not release physical keys.
+        self.session.drop("pressed")
+        self.assertIsNone(events.get_nowait())
+
     def test_keyboard_paint_is_applied_in_the_receiving_tick_without_ui_or_disk(self):
         import queue
         import threading

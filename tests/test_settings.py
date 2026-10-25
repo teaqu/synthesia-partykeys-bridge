@@ -99,3 +99,24 @@ class SettingsTests(unittest.TestCase):
     def test_shipped_config_matches_defaults(self):
         root = Path(__file__).resolve().parents[1]
         self.assertEqual(settings.load(root / "config.json"), settings.DEFAULTS)
+
+    def test_bridge_brightness_restores_at_startup_and_reloads_on_existing_cues(self):
+        self.config["lighting"]["bridge_brightness"] = .3
+        self.config["lighting"]["bridge_enabled"] = False
+        self.save()
+        args = parser().parse_args(["bridge"])
+        settings.apply_startup(args, settings.load(self.path), [])
+        self.assertEqual(args.bridge_brightness, .3)
+        self.assertFalse(args.bridge_enabled)
+        bridge = Bridge()
+        bridge.set_brightness(args.bridge_brightness)
+        bridge.enabled = args.bridge_enabled
+        bridge.receive(mido.Message("note_on", channel=1, note=60))
+        watcher = settings.ConfigWatcher(self.path, deepcopy(self.config), args, [])
+        self.config["lighting"]["bridge_brightness"] = .5
+        self.config["lighting"]["bridge_enabled"] = True
+        self.save()
+        watcher.poll()
+        watcher.apply(SimpleNamespace(args=args, bridge=bridge, driver=None))
+        self.assertEqual(bridge.lights()[60], (0, 40, 128))
+        self.assertTrue(bridge.enabled)
