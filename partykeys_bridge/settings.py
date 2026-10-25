@@ -36,9 +36,44 @@ def resolve_color(value, palette):
     return rgb(palette.get(value, value)) if isinstance(value, str) else rgb(value)
 
 
+def mac_app_bundle():
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        executable = Path(sys.executable)
+        app = executable.parent.parent.parent
+        if executable.parent.name == "MacOS" and executable.parent.parent.name == "Contents" and app.suffix == ".app":
+            return app
+    return None
+
+
 def default_path():
+    if mac_app_bundle() is not None:
+        return Path.home() / "Library" / "Application Support" / "PartyKeys Lights" / "config.json"
     root = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
     return root / "config.json"
+
+
+def prepare_app_config():
+    """Keep mutable Mac settings outside the app and import a sibling file once."""
+    app = mac_app_bundle()
+    if app is None:
+        return
+    path = default_path()
+    if path.exists():
+        load(path, required=True)
+        return
+    seed = app.parent / "config.json"
+    try:
+        config = load(seed) if seed.is_file() else deepcopy(DEFAULTS)
+    except ValueError as error:
+        LOG.warning("Could not import %s; starting with defaults: %s", seed, error)
+        config = deepcopy(DEFAULTS)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as stream:
+            json.dump(config, stream, indent=2)
+            stream.write("\n")
+    except FileExistsError:
+        pass  # Another app instance initialized it first; never replace it.
 
 
 def load(path, required=False):

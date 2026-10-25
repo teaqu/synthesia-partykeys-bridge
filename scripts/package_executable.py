@@ -19,6 +19,8 @@ if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.+-]*", version):
     raise SystemExit("Project version cannot be used in an archive filename")
 name = f"partykeys-lights-v{version}-{args.platform}"
 bundle = root / "dist" / name
+if bundle.exists():
+    shutil.rmtree(bundle)  # This generated staging folder must not retain old launchers.
 bundle.mkdir(parents=True, exist_ok=True)
 windows = args.platform.startswith("windows-")
 exe = "partykeys.exe" if windows else "partykeys"
@@ -34,20 +36,26 @@ if windows:
                     ignore=shutil.ignore_patterns("*.pdb"))
     shutil.copy2(root / "native" / "windows-midi-helper" / "PREVIEW.txt", bundle / "WINDOWS-MIDI-PREVIEW.txt")
 shutil.copy2(root / "config.json", bundle / "config.json")
-practice_launcher = "Practice lights.cmd" if windows else "Practice lights.command"
-shutil.copy2(root / "packaging" / practice_launcher, bundle / practice_launcher)
+if windows:
+    shutil.copy2(root / "dist" / "PartyKeys Lights.exe", bundle / "PartyKeys Lights.exe")
+else:
+    shutil.copytree(root / "dist" / "PartyKeys Lights.app", bundle / "PartyKeys Lights.app", symlinks=True)
 if not windows:
     (bundle / exe).chmod(0o755)
     (bundle / launcher).chmod(0o755)
-    (bundle / practice_launcher).chmod(0o755)
 shutil.copytree(root / "docs" / "images", bundle / "docs" / "images", dirs_exist_ok=True)
 subprocess.run([sys.executable, str(root / "scripts" / "bundle_notices.py"),
                 str(bundle)], check=True)
 archive = root / "dist" / (name + ".zip")
-with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
-    for source in sorted(bundle.rglob("*")):
-        if source.is_file():
-            z.write(source, source.relative_to(bundle))
+if windows:
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+        for source in sorted(bundle.rglob("*")):
+            if source.is_file():
+                z.write(source, source.relative_to(bundle))
+else:
+    # PyInstaller .apps contain framework symlinks. Dereferencing those breaks
+    # their signatures; ditto preserves the app exactly as Finder expects it.
+    subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", str(bundle), str(archive)], check=True)
 digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 archive.with_suffix(".sha256").write_text(f"{digest}  {archive.name}\n", encoding="ascii")
 print(f"Packaged {archive.name}: {digest}")

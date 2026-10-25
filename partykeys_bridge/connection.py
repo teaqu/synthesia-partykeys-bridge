@@ -264,7 +264,7 @@ class BridgeConnection:
                     self.windows_device.close()
 
     def run(self):
-        print("Bridge running with automatic reconnection. Ctrl+C clears lights and exits.")
+        LOG.info("Keyboard connection running with automatic reconnection.")
         try:
             if self.config_watcher:
                 self.config_watcher.start()

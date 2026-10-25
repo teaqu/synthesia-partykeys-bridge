@@ -8,12 +8,14 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
 1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.7/partykeys-lights-v0.1.7-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.7/partykeys-lights-v0.1.7-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.7/partykeys-lights-v0.1.7-macos-x64.zip).
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
-3. Open the launcher for your platform:
+3. Open the GUI for your platform:
 
    | Platform | Open this file |
    | --- | --- |
-   | Windows | **Practice lights.cmd** |
-   | macOS, Apple Silicon or Intel | **Practice lights.command** |
+   | Windows | **PartyKeys Lights.exe** |
+   | macOS, Apple Silicon or Intel | **PartyKeys Lights.app** |
+
+   Older downloads, including v0.1.7, use **Practice lights.cmd** on Windows or **Practice lights.command** on Mac instead.
 
 4. Keep the window open. For practice lights, choose a colour and **Paint** or **Erase**, then click keys. Right-click temporarily does the opposite. To edit by playing your physical keyboard, enable **Use physical keyboard to paint / erase**. For Synthesia, follow the [Mac setup](#set-up-synthesia-on-macos) or [Windows setup](#set-up-on-windows) once, then start a song.
 
@@ -35,7 +37,7 @@ The console launcher remains available for terminal use.
 [![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.7/partykeys-lights-v0.1.7-macos-x64.zip)
 [![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.7/partykeys-lights-v0.1.7-windows-x64.zip)
 
-Each download includes the desktop app, **Practice lights** launcher, console launcher, setup guide and license notices. No GitHub sign-in is needed.
+Each download includes the desktop app, an optional console launcher, setup guide and license notices. No GitHub sign-in is needed.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
@@ -64,9 +66,16 @@ by default). Changes apply live, including to keys already lit, and are saved
 for the next launch. Practice brightness and trail maximum brightness remain
 independent. Below 100%, the bridge uses per-key RGB to dim the hardware's
 otherwise fixed-brightness palette colours.
-Turn off **Enable bridge lights** to hide Synthesia cues and their trails on the
+Turn off **Enable Synthesia lights** to hide Synthesia cues and their trails on the
 physical keyboard. Practice lights and GUI pressed-key feedback keep working.
 Re-enable it to restore the current cues. This setting is also saved.
+**Disconnect keyboard** stops all lighting and physical-key input; it is for
+closing the connection, rather than pausing Synthesia cues. Use **Enable Synthesia
+lights** to pause song lighting while continuing to use practice lights.
+
+Open **Logs…** to see connection and error output in the GUI. The log stays
+available for the current session when the Logs window is closed, and updates
+while it is open. Normal GUI use does not need a Terminal or console window.
 Enable **Use physical keyboard to paint / erase** to apply the selected mode
 by playing your physical keyboard; turn this off for normal
 practice. Releasing a key does not erase its saved practice colour.
@@ -120,11 +129,15 @@ This is an independent community project, not an official Synthesia or PartyKeys
 
 ## Opening your download
 
-Extract the ZIP before running it, then open **Practice lights**. Current builds include the app executable, both launchers, this guide, and license notices. The Mac downloads are not notarized; if macOS blocks the launcher or executable, review it in **System Settings → Privacy & Security** and use **Open Anyway** if you trust the download. The Windows executable is unsigned.
+Extract the ZIP before running it, then open **PartyKeys Lights.app** on Mac or **PartyKeys Lights.exe** on Windows. The GUI starts directly; the console launcher is optional. On older downloads such as v0.1.7, use the **Practice lights** launcher instead.
+
+The Mac app bundles the GUI and its runtime together, avoiding the separate GUI shell launcher and executable. These builds still have no Apple Developer ID signature or notarization, so macOS can still require **System Settings → Privacy & Security → Open Anyway** and authentication. The app format does not guarantee that these checks disappear. The Windows executable is also unsigned.
+
+The Mac app saves settings in `~/Library/Application Support/PartyKeys Lights/config.json`, outside the app, so replacing the app preserves them. On first launch it imports a valid `config.json` beside the app if one is available; otherwise it uses the defaults. To migrate older settings when the app has already been moved or macOS isolates it during first launch, quit it and copy your old config to that Application Support location before reopening. The console executable and Windows GUI continue to use `config.json` beside their executable.
 
 ## Set up Synthesia on macOS
 
-1. Double-click **Practice lights.command** in the extracted Mac GUI build and keep the window open. It starts the bridge and creates a MIDI destination named **Synthesia Lights** automatically. **Start Synthesia bridge.command** is the console-only alternative.
+1. Double-click **PartyKeys Lights.app** and keep the window open. It starts the lighting connection and creates a MIDI destination named **Synthesia Lights** automatically. Older downloads such as v0.1.7 use **Practice lights.command**. **Start Synthesia bridge.command** remains the console-only alternative.
 
 2. Open **Synthesia → Settings → Music Devices**. Enable **PartyKeys** under **Music Input** and disable **PartyKeys** under **Music Output**. Keep **Built-in MIDI Synthesizer** enabled for sound, then select **Synthesia Lights** under **Music Output**.
 
@@ -151,7 +164,7 @@ Close the app window when you finish to clear the lights and stop the bridge.
 
 On **Windows 11 25H2 or newer**, the app creates the Synthesia connection automatically. For older Windows versions, use the [loopMIDI setup below](#using-loopmidi-instead).
 
-1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside `partykeys.exe`. Double-click **Practice lights.cmd** and keep the window open. **Start Synthesia bridge.cmd** is the console-only alternative.
+1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside **PartyKeys Lights.exe**. Double-click **PartyKeys Lights.exe** and keep the window open. Older downloads such as v0.1.7 use **Practice lights.cmd**. **Start Synthesia bridge.cmd** remains the console-only alternative.
 2. Open Synthesia → Settings → Music Devices. Use **PartyKeys** for Music Input and disable PartyKeys under Music Output. Keep the built-in synthesizer enabled for sound.
 3. Select **Synthesia Lights** under Music Output and enable sending to it. Disable My Notes, Background Instruments, Percussion, and Metronome on that output. Select **Key Lights → Finger-based channel**.
 4. Start a song. Close the GUI window to clear the lights and remove its temporary MIDI ports. For the console alternative, press Ctrl+C in its terminal.
@@ -177,7 +190,7 @@ For older Windows versions, or when using loopMIDI instead of the native MIDI AP
 
 1. Install and open [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html).
 2. On **Setup**, enter **Synthesia Lights** in **New port-name**, then click **+** at the bottom left. The new port appears in the list, as shown below.
-3. Leave loopMIDI running, then open **Practice lights.cmd** (or **Start Synthesia bridge.cmd** for console use). Keep `midi.input` in `config.json` set to `Synthesia Lights`; the bridge reuses that port without starting its native MIDI helper. You can also set `midi.create_virtual_input` to `false` to explicitly use the existing port.
+3. Leave loopMIDI running, then open **PartyKeys Lights.exe** (or the **Practice lights.cmd** launcher on older downloads). Keep `midi.input` in `config.json` set to `Synthesia Lights`; the bridge reuses that port without starting its native MIDI helper. You can also set `midi.create_virtual_input` to `false` to explicitly use the existing port.
 4. In Synthesia, select **Synthesia Lights** under **Music Output**, enable sending, leave ordinary notes off, and choose **Key Lights → Finger-based channel**, as shown in the Windows screenshots above. Keep **PartyKeys** as Music Input and its Music Output off.
 
 ![loopMIDI with the created Synthesia Lights port, received MIDI data and active throughput](docs/images/windows-loopmidi-port-created.png)
@@ -309,7 +322,7 @@ With automatic discovery (no explicit `--board` options), the bridge discovers c
 
 All mapped keys are explicitly cleared on connection, MIDI Stop/Reset, Synthesia's channel-1 CC16 reset, and all-notes/all-sounds-off messages. These clears bypass cached LED state and use paced per-key off packets. Waiting for a note does not trigger a silence timeout. A menu or pause action that sends no MIDI reset cannot be distinguished from waiting using silence alone.
 
-Both platform launchers read **config.json** beside the executable. Edit it with a text editor and save. Colour/palette changes apply while the bridge runs, normally within half a second, including to notes already lit. Invalid or incomplete JSON edits are ignored until corrected; the last valid settings remain active.
+The Mac app reads **config.json** from `~/Library/Application Support/PartyKeys Lights/`; Windows and console launchers read it beside the executable. Edit it with a text editor and save. Colour/palette changes apply while the bridge runs, normally within half a second, including to notes already lit. Invalid or incomplete JSON edits are ignored until corrected; the last valid settings remain active.
 
 - `palette` gives names to six-digit RGB values. For example, `"purple": "B400FF"`.
 - `lighting.left_color` and `lighting.right_color` accept a palette name or a six-digit RGB value. Defaults are left blue and right green.
