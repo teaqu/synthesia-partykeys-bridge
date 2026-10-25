@@ -9,7 +9,7 @@ import rtmidi
 
 from .driver import MidiInput, PalettePartyKeys, make_driver, octave_report, select_port
 from .windows_midi import WindowsVirtualInput, existing_route
-from .practice import capture_key, paint_practice
+from .practice import capture_key, paint_practice, physical_key_event
 
 LOG = logging.getLogger("partykeys")
 # InvalidPortError inherits ValueError, not RuntimeError/OSError. Catch the
@@ -63,6 +63,8 @@ class BridgeConnection:
             self.bridge.active.clear()
             self.bridge.counts.clear()
         elif kind == "pressed":
+            if port:
+                physical_key_event(self.args)
             if self.auto_board_routes and self.ports["output"]:
                 self.drop("output")
         if port:
@@ -195,6 +197,7 @@ class BridgeConnection:
                     if kind == "cue":
                         self.bridge.receive(message)
                     else:
+                        physical_key_event(self.args, message)
                         captured = capture_key(self.args, message)
                         if captured is not None:
                             self.bridge.set_practice(paint_practice(self.bridge.practice, captured, self.practice_erase))

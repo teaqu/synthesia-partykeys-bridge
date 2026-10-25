@@ -10,7 +10,7 @@ import unittest
 import mido
 
 from partykeys_bridge.bridge import Bridge
-from partykeys_bridge.practice import capture_key, practice_lights, ExactRGB, LiveLighting, paint_practice
+from partykeys_bridge.practice import capture_key, practice_lights, ExactRGB, LiveLighting, paint_practice, physical_key_event
 from partykeys_bridge import settings
 from partykeys_bridge.driver import PalettePartyKeys
 
@@ -136,6 +136,26 @@ class TrailAndColorTests(unittest.TestCase):
         capture_key(args, mido.Message("note_off", note=60))
         self.assertEqual(args.practice_key_events.get_nowait(), 60)
         self.assertTrue(args.practice_key_events.empty())
+
+    def test_gui_key_stream_includes_releases_and_resets_without_paint_capture(self):
+        args = SimpleNamespace(physical_key_events=queue.SimpleQueue())
+        messages = [mido.Message("note_on", note=60),
+                    mido.Message("note_off", note=60),
+                    mido.Message("note_on", note=61, velocity=0),
+                    mido.Message("control_change", channel=2, control=123),
+                    mido.Message("control_change", channel=2, control=120),
+                    mido.Message("stop"), mido.Message("reset")]
+        for message in messages:
+            physical_key_event(args, message)
+        physical_key_event(args, mido.Message("control_change", control=64))
+        physical_key_event(args, mido.Message("clock"))
+        for expected in messages:
+            actual = args.physical_key_events.get_nowait()
+            self.assertEqual(actual, expected)
+            self.assertIsNot(actual, expected)
+        self.assertTrue(args.physical_key_events.empty())
+        physical_key_event(args)
+        self.assertIsNone(args.physical_key_events.get_nowait())
 
     def test_trail_fades_after_release_and_retrigger_restores_full_color(self):
         now = [10.]

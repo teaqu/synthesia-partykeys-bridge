@@ -62,6 +62,13 @@ Enable **Use physical keyboard to paint / erase** to apply the selected mode
 by playing your physical keyboard; turn this off for normal
 practice. Releasing a key does not erase its saved practice colour.
 
+Selected keys show a check mark and retain their saved colour. Physically held
+keys look pushed down, with a darker face, inset shadow, and lowered label, even
+when **Use physical keyboard to paint / erase** is off. This lets you identify
+pitches without editing the selection. The view scrolls to reveal keys you play,
+and keys return to their normal appearance and saved colour on release.
+Clicking a key also pushes it down until you release the mouse button.
+
 Enable **Trail mode** to fade Synthesia cues after note release, with a duration
 from 0.25 to 30 seconds. **Trail max brightness** caps the released trail (35%
 by default) independently of practice brightness and held cues. On release it
@@ -166,7 +173,8 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 
 ## Troubleshooting
 
-- **Wrong keys, shifted lights or a missing second keyboard:** stop the app and unplug the MIDI/USB cable. Return the keyboard to its default octave before plugging the cable back in. If a second keyboard is joined, detach it and attach it again too, then restart the app.
+- **Shifted lights, missing low notes, or playing the right keyboard paints the left:** the app may have started after the keyboard was already octave-shifted. Keep the bridge running and use the physical octave buttons to select the desired octave; each press reports the resulting octave and resyncs both Synthesia and practice-light routing. To return to the same octave, move one step away from the current setting and back (choose a direction that is not already at its limit). Starting the bridge assumes octave zero until it receives an octave report.
+- **A joined keyboard is still missing after octave resync:** stop the app and unplug the MIDI/USB cable. Detach and reattach the joined keyboard, reconnect USB, then restart the app. If the octave is already shifted, resync it using the octave buttons while the bridge runs.
 - **No practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
 - **Playing keys does not assign colours:** enable **Use physical keyboard to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
@@ -363,7 +371,7 @@ Use your device's actual port names, routing channel, addresses, and note ranges
 
 **Octave buttons work automatically while the bridge is running.** The bridge reads octave reports from the keyboard input (`--keyboard-input`), shifts configured boards on that routing channel, and redraws the current cues.
 
-If the keyboard is already shifted before starting the bridge, pass its current setting with `--initial-octave -1` (one octave down, for example). Keep the `--board` lowest notes at their octave-zero values. Later button presses override this starting value automatically; the bridge also preserves the latest reported octave when reconnecting its output. Octave changes made while the physical input is disconnected cannot be observed until the keyboard sends another report.
+If the keyboard is already shifted before starting the bridge, use its physical octave buttons while the bridge runs to report and resync the desired octave (see [Troubleshooting](#troubleshooting)). Console users can instead pass the current setting with `--initial-octave -1` (one octave down, for example). Keep the `--board` lowest notes at their octave-zero values. Later button presses override this starting value automatically; the bridge also preserves the latest reported octave when reconnecting its output. Octave changes made while the physical input is disconnected cannot be observed until the keyboard sends another report.
 
 Notes outside the physical ranges stay unlit. The live palette bridge automatically discovers board routes when `--board` is omitted. Independent preview/test commands use broadcast MIDI addressing unless explicit board routes are provided. The standalone `--protocol rgb15` driver supports a single 36-key board: `--base-note` sets its leftmost note (default 48).
 

@@ -61,5 +61,18 @@ def capture_key(args, message):
     return None
 
 
+def physical_key_event(args, message=None):
+    """Notify the GUI of physical key state independently of paint capture.
+
+    None means the input disconnected. Only the GUI consumes this stream;
+    it must never change practice colours or send MIDI output.
+    """
+    events = getattr(args, "physical_key_events", None)
+    if events is not None and (message is None or message.type in (
+            "note_on", "note_off", "reset", "stop") or
+            (message.type == "control_change" and message.control in (120, 123))):
+        events.put(message.copy() if message is not None else None)
+
+
 def note_name(note):
     return f'{("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")[note % 12]}{note // 12 - 1}'

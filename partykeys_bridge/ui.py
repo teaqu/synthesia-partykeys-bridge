@@ -101,6 +101,9 @@ class Window:
         self.capture_enabled = tk.BooleanVar(value=False)
         self.capture = threading.Event()
         self.key_events = queue.SimpleQueue()
+        self.held_events = queue.SimpleQueue()
+        self.pressed = set()
+        self.mouse_note = None
         self.live_lighting = LiveLighting()
         self.trail_enabled = tk.BooleanVar(value=config["trail"]["enabled"])
         self.trail_seconds = tk.StringVar(value=str(config["trail"]["duration_seconds"]))
@@ -124,7 +127,10 @@ class Window:
         root.minsize(740, 650)
         frame = ttk.Frame(root, padding=18)
         frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text="Practice lights", font=("", 18, "bold")).pack(anchor="w")
+        title_row = ttk.Frame(frame)
+        title_row.pack(fill="x")
+        ttk.Label(title_row, text="Practice lights", font=("", 18, "bold")).pack(side="left")
+        ttk.Label(title_row, text="✓ Selected · sunken = pressed").pack(side="right")
         ttk.Label(frame, text="Choose Paint or Erase, then click keys. Right-click does the opposite. Synthesia cues appear over practice lights.",
                   wraplength=700).pack(anchor="w", pady=(4, 14))
         row = ttk.Frame(frame)
@@ -165,11 +171,17 @@ class Window:
         scroll.pack(fill="x")
         self.canvas.configure(xscrollcommand=scroll.set)
         self.keys = {}
+        self.key_labels = {}
+        self.selection_marks = {}
+        self.held_marks = {}
         self.draw_keyboard()
         self.canvas.bind("<Button-1>", self.click)
         aqua = root.tk.call("tk", "windowingsystem") == "aqua"
         self.secondary_click = secondary_click_sequence(root)
         self.canvas.bind(self.secondary_click, lambda event: self.click(event, invert=True))
+        for sequence in ("<ButtonRelease-1>", self.secondary_click.replace("Button-", "ButtonRelease-")):
+            self.canvas.bind(sequence, self.release_click)
+        root.bind("<FocusOut>", self.release_click, add=True)
         if aqua:
             self.canvas.bind("<Control-Button-1>", lambda event: self.click(event, invert=True))
         def show_start_octave():
@@ -219,7 +231,8 @@ class Window:
                 continue
             x = white * 30
             self.keys[note] = self.canvas.create_rectangle(x, 0, x + 30, 130, fill="white", outline="#a8adb5", tags=(f"note:{note}",))
-            self.canvas.create_text(x + 15, 114, text=note_name(note), font=("", 8), fill="#14161b", tags=(f"note:{note}",))
+            self.key_labels[note] = self.canvas.create_text(x + 15, 114, text=note_name(note), font=("", 8), fill="#14161b", tags=(f"note:{note}",))
+            self.draw_key_marks(note, x, 30, 130)
             white += 1
         white = 0
         for note in range(128):
@@ -228,7 +241,47 @@ class Window:
                 continue
             x = white * 30 - 10
             self.keys[note] = self.canvas.create_rectangle(x, 0, x + 20, 78, fill="#252932", outline="#14161b", tags=(f"note:{note}",))
+            self.draw_key_marks(note, x, 20, 78)
         self.canvas.configure(scrollregion=(0, 0, white * 30, 132))
+
+    def draw_key_marks(self, note, x, width, height):
+        tags = (f"note:{note}",)
+        middle, y = x + width / 2, height - 32
+        self.selection_marks[note] = self.canvas.create_line(
+            middle - 4, y, middle - 1, y + 3, middle + 5, y - 4,
+            width=2, state="hidden", tags=tags)
+        # Inset shadows and a lower face make a held key look physically down.
+        self.held_marks[note] = (
+            self.canvas.create_rectangle(x + 1, 0, x + width - 1, 7,
+                                         width=0, state="hidden", tags=tags),
+            self.canvas.create_line(x + 2, height - 2, x + 2, 8, x + width - 2, 8,
+                                    width=2, state="hidden", tags=tags),
+            self.canvas.create_line(x + 3, height - 2, x + width - 2, height - 2,
+                                    width=2, state="hidden", tags=tags))
+
+    @property
+    def held_notes(self):
+        return {note for _, note in self.pressed}
+
+    def reveal_note(self, note):
+        x1, _, x2, _ = self.canvas.coords(self.keys[note])
+        left, width = self.canvas.canvasx(0), self.canvas.winfo_width()
+        total = float(self.canvas.cget("scrollregion").split()[2])
+        if x1 < left:
+            self.canvas.xview_moveto(max(0, x1 - 30) / total)
+        elif x2 > left + width:
+            self.canvas.xview_moveto(max(0, x2 - width + 30) / total)
+
+    def held_event(self, message):
+        if message is None or message.type in ("reset", "stop"):
+            self.pressed.clear()
+        elif message.type == "control_change" and message.control in (120, 123):
+            self.pressed = {key for key in self.pressed if key[0] != message.channel}
+        elif message.type == "note_on" and message.velocity:
+            self.pressed.add((message.channel, message.note))
+            self.reveal_note(message.note)
+        elif message.type in ("note_on", "note_off"):
+            self.pressed.discard((message.channel, message.note))
 
     def click(self, event, invert=False):
         # Hit-test the event position directly: secondary clicks need not have
@@ -238,9 +291,15 @@ class Window:
             for tag in self.canvas.gettags(item):
                 if tag.startswith("note:"):
                     erase = (self.paint_mode.get() == "erase") != invert
-                    self.paint_note(int(tag.split(":")[1]), erase=erase)
+                    self.mouse_note = int(tag.split(":")[1])
+                    self.paint_note(self.mouse_note, erase=erase)
                     return "break"
         return "break"
+
+    def release_click(self, event=None):
+        if self.mouse_note is not None:
+            self.mouse_note = None
+            self.refresh()
 
     def paint_note(self, note, erase=None):
         if erase is None:
@@ -273,14 +332,40 @@ class Window:
         self.changed()
 
     def refresh(self):
+        held = self.held_notes
         for note, item in self.keys.items():
-            fill = "#" + self.note_colors.get(note, self.color) if note in self.selected else ("#252932" if note % 12 in (1, 3, 6, 8, 10) else "white")
-            self.canvas.itemconfigure(item, fill=fill)
+            selected = note in self.selected
+            down = note in held or note == self.mouse_note
+            fill = self.note_colors.get(note, self.color) if selected else ("252932" if note % 12 in (1, 3, 6, 8, 10) else "FFFFFF")
+            rgb = [int(fill[i:i+2], 16) for i in (0, 2, 4)]
+            if down:
+                rgb = [round(c * .72) for c in rgb]
+            fill = "#" + "".join(f"{c:02X}" for c in rgb)
+            foreground = ColorButton.text_color(fill[1:])
+            x1, _, x2, height = self.canvas.coords(item)
+            self.canvas.coords(item, x1, 4 if down else 0, x2, height)
+            self.canvas.itemconfigure(item, fill=fill, width=2 if selected else 1,
+                                      outline=foreground if selected else ("#14161b" if note % 12 in (1, 3, 6, 8, 10) else "#a8adb5"))
+            if note in self.key_labels:
+                self.canvas.itemconfigure(self.key_labels[note], fill=foreground)
+                self.canvas.coords(self.key_labels[note], (x1 + x2) / 2, height - 16 + (3 if down else 0))
+            self.canvas.itemconfigure(self.selection_marks[note], fill=foreground,
+                                      state="normal" if selected else "hidden")
+            middle, y = (x1 + x2) / 2, height - 32 + (3 if down else 0)
+            self.canvas.coords(self.selection_marks[note], middle - 4, y, middle - 1, y + 3, middle + 5, y - 4)
+            shadow = "#" + "".join(f"{round(c * .35):02X}" for c in rgb)
+            edge = "#" + "".join(f"{round(c + (255 - c) * .35):02X}" for c in rgb)
+            self.canvas.itemconfigure(self.held_marks[note][0], fill=shadow)
+            self.canvas.itemconfigure(self.held_marks[note][1], fill=shadow)
+            self.canvas.itemconfigure(self.held_marks[note][2], fill=edge)
+            for marker in self.held_marks[note]:
+                self.canvas.itemconfigure(marker, state="normal" if down else "hidden")
         self.swatch.set_color(self.color)
         self.percent.set(f"{round(self.brightness.get())}%")
         self.trail_percent.set(f"{round(self.trail_brightness.get())}%")
-        names = ", ".join(note_name(n) for n in sorted(self.selected))
-        self.summary.set(f"{len(self.selected)} keys" + (": " + names[:60] + ("…" if len(names) > 60 else "") if names else " — click to select"))
+        names = ", ".join(note_name(n) for n in sorted(held or self.selected))
+        prefix = f"{len(self.selected)} selected" + (f" · {len(held)} held" if held else "")
+        self.summary.set(prefix + (": " + names[:50] + ("…" if len(names) > 50 else "") if names else " — click to select"))
 
     def changed(self):
         self.refresh()
@@ -343,6 +428,7 @@ class Window:
         args.trail = config["trail"]
         args.practice_capture = self.capture
         args.practice_key_events = self.key_events
+        args.physical_key_events = self.held_events
         args.live_lighting = self.live_lighting
         args.stop_event = self.stop = threading.Event()
         args.config_watcher = settings.ConfigWatcher(self.path, config, args, getattr(self.args, "startup_argv", ["bridge"]))
@@ -366,14 +452,25 @@ class Window:
         else:
             self.start_bridge()
 
-    def poll(self):
+    def drain_key_events(self):
+        previous = set(self.pressed)
+        while not self.held_events.empty():
+            self.held_event(self.held_events.get())
         while not self.key_events.empty():
             note = self.key_events.get()
             if self.capture.is_set():
                 self.paint_note(note)
+        if self.pressed != previous:
+            self.refresh()
+
+    def poll(self):
+        self.drain_key_events()
         while not self.events.empty():
             self.status.set(self.events.get())
         if self.worker and not self.worker.is_alive():
+            if self.pressed:
+                self.pressed.clear()
+                self.refresh()
             self.toggle.configure(text="Start bridge", state="normal")
         if self.closing and (not self.worker or not self.worker.is_alive()):
             logging.getLogger("partykeys").removeHandler(self.log_handler)
@@ -433,7 +530,11 @@ def smoke_test(args):
             x1, _, x2, _ = window.canvas.coords(window.keys[note])
             x = round((x1 + x2) / 2 - window.canvas.canvasx(0))
             window.canvas.event_generate(sequence, x=x, y=y)
+            if sequence in ("<Button-1>", window.secondary_click, "<Control-Button-1>"):
+                assert window.canvas.coords(window.keys[note])[1] == 4, "Mouse-pressed key did not sink"
             window.canvas.event_generate(sequence.replace("Button-", "ButtonRelease-"), x=x, y=y)
+            assert window.mouse_note is None, "Mouse release retained a pressed key"
+            assert window.canvas.coords(window.keys[note])[1] == 0, "Mouse-released key stayed sunken"
 
         def check_erase_and_close():
             try:
@@ -515,6 +616,39 @@ def smoke_test(args):
                 assert set(window.selected) == {60, 64}, "Disabling practice lights lost the selection"
                 window.enable_toggle.invoke()
                 assert window.enabled.get(), "Practice lights did not enable"
+                # Physical key display remains active while paint capture is off.
+                import mido
+                from .practice import physical_key_event
+                events_args = copy(args)
+                events_args.physical_key_events = window.held_events
+                def physical(message):
+                    physical_key_event(events_args, message)
+                    window.drain_key_events()
+                physical(mido.Message("note_on", note=60, channel=0))
+                physical(mido.Message("note_on", note=60, channel=1))
+                physical(mido.Message("note_on", note=61))
+                assert window.held_notes == {60, 61}, "Unarmed physical presses were not highlighted"
+                assert window.selected == {60, 64}, "Unarmed physical presses painted the selection"
+                assert window.canvas.itemcget(window.keys[60], "fill") == "#003AB8", "Pressed key did not shade its saved colour"
+                assert window.canvas.coords(window.keys[60])[1] == 4, "Pressed key face did not sink"
+                assert window.canvas.coords(window.key_labels[60])[1] == 117, "Pressed key label did not move down"
+                assert window.canvas.itemcget(window.selection_marks[60], "state") == "normal", "Selected key has no check mark"
+                assert window.canvas.itemcget(window.held_marks[61][1], "state") == "normal", "Black pressed key has no inset shadow"
+                physical(mido.Message("note_off", note=60, channel=0))
+                assert 60 in window.held_notes, "Releasing one channel released another channel's held key"
+                physical(mido.Message("note_on", note=60, channel=1, velocity=0))
+                assert 60 not in window.held_notes, "Velocity-zero note-on did not release the highlight"
+                assert window.canvas.itemcget(window.held_marks[60][1], "state") == "hidden", "Released key retained pressed shadow"
+                assert window.canvas.itemcget(window.keys[60], "fill") == "#0050FF", "Release did not restore the saved colour"
+                assert window.canvas.coords(window.keys[60])[1] == 0, "Released key face stayed sunken"
+                assert window.canvas.coords(window.key_labels[60])[1] == 114, "Released key label stayed down"
+                physical(mido.Message("control_change", control=123))
+                assert not window.held_notes, "All-notes-off retained held keys"
+                physical(mido.Message("note_on", note=24))
+                x1, _, x2, _ = window.canvas.coords(window.keys[24])
+                assert window.canvas.canvasx(0) <= x1 < x2 <= window.canvas.canvasx(window.canvas.winfo_width()), "Played key was not revealed"
+                physical(None)
+                assert not window.held_notes, "Disconnected input retained held keys"
                 window.capture_enabled.set(True)
                 window.set_capture()
                 window.key_events.put(67)
