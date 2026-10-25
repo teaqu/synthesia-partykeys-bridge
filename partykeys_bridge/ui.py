@@ -108,6 +108,9 @@ class Window:
         self.held_events = queue.SimpleQueue()
         self.pressed = set()
         self.mouse_note = None
+        self.stroke_erase = None
+        self.stroke_notes = set()
+        self.stroke_point = None
         self.live_lighting = LiveLighting()
         self.trail_enabled = tk.BooleanVar(value=config["trail"]["enabled"])
         self.trail_seconds = tk.StringVar(value=str(config["trail"]["duration_seconds"]))
@@ -138,7 +141,7 @@ class Window:
         title_row.pack(fill="x")
         ttk.Label(title_row, text="Practice lights", font=("", 18, "bold")).pack(side="left")
         ttk.Label(title_row, text="Sunken keys are pressed").pack(side="right")
-        ttk.Label(frame, text="Choose Paint or Erase, then click keys. Right-click does the opposite. Synthesia cues appear over practice lights.",
+        ttk.Label(frame, text="Choose Paint or Erase, then click or drag across keys. Right-click does the opposite. Synthesia cues appear over practice lights.",
                   wraplength=700).pack(anchor="w", pady=(4, 14))
         row = ttk.Frame(frame)
         row.pack(fill="x")
@@ -185,6 +188,8 @@ class Window:
         aqua = root.tk.call("tk", "windowingsystem") == "aqua"
         self.secondary_click = secondary_click_sequence(root)
         self.canvas.bind(self.secondary_click, lambda event: self.click(event, invert=True))
+        for sequence in ("<B1-Motion>", self.secondary_click.replace("Button-", "B").replace(">", "-Motion>")):
+            self.canvas.bind(sequence, self.drag)
         for sequence in ("<ButtonRelease-1>", self.secondary_click.replace("Button-", "ButtonRelease-")):
             self.canvas.bind(sequence, self.release_click)
         root.bind("<FocusOut>", self.release_click, add=True)
@@ -296,25 +301,55 @@ class Window:
         elif message.type in ("note_on", "note_off"):
             self.pressed.discard((message.channel, message.note))
 
-    def click(self, event, invert=False):
-        # Hit-test the event position directly: secondary clicks need not have
-        # updated Tk's "current" item (for example, without pointer movement).
-        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+    def note_at(self, x, y):
+        # Only keys inside the visible canvas can be painted by a drag.
+        if not 0 <= x < self.canvas.winfo_width() or not 0 <= y < self.canvas.winfo_height():
+            return None
+        x, y = self.canvas.canvasx(x), self.canvas.canvasy(y)
         for item in reversed(self.canvas.find_overlapping(x, y, x, y)):
             for tag in self.canvas.gettags(item):
                 if tag.startswith("note:"):
-                    erase = (self.paint_mode.get() == "erase") != invert
-                    self.mouse_note = int(tag.split(":")[1])
-                    self.paint_note(self.mouse_note, erase=erase)
-                    return "break"
+                    return int(tag.split(":")[1])
+        return None
+
+    def click(self, event, invert=False):
+        self.stroke_erase = (self.paint_mode.get() == "erase") != invert
+        self.stroke_notes.clear()
+        self.stroke_point = (event.x, event.y)
+        return self.drag(event)
+
+    def drag(self, event):
+        if self.stroke_erase is None:
+            return "break"
+        x, y = self.stroke_point
+        dx, dy = event.x - x, event.y - y
+        # Cover the path between motion events so fast drags don't skip keys.
+        steps = max(1, int(max(abs(dx), abs(dy)) / 4) + 1)
+        changed = False
+        for step in range(steps + 1):
+            note = self.note_at(x + dx * step / steps, y + dy * step / steps)
+            if note is not None and note not in self.stroke_notes:
+                self.stroke_notes.add(note)
+                self.paint_note(note, erase=self.stroke_erase, notify=False)
+                changed = True
+        previous = self.mouse_note
+        self.mouse_note = self.note_at(event.x, event.y)
+        self.stroke_point = (event.x, event.y)
+        if changed:
+            self.changed()
+        elif self.mouse_note != previous:
+            self.refresh()
         return "break"
 
     def release_click(self, event=None):
+        self.stroke_erase = None
+        self.stroke_notes.clear()
+        self.stroke_point = None
         if self.mouse_note is not None:
             self.mouse_note = None
             self.refresh()
 
-    def paint_note(self, note, erase=None):
+    def paint_note(self, note, erase=None, notify=True):
         if erase is None:
             erase = self.paint_mode.get() == "erase"
         if erase:
@@ -324,7 +359,8 @@ class Window:
             self.selected.add(note)
             self.note_colors[note] = self.color
             self.enabled.set(True)
-        self.changed()
+        if notify:
+            self.changed()
 
     def set_capture(self):
         if self.capture_enabled.get():
@@ -550,6 +586,22 @@ def smoke_test(args):
             assert window.mouse_note is None, "Mouse release retained a pressed key"
             assert window.canvas.coords(window.keys[note])[1] == 0, "Mouse-released key stayed sunken"
 
+        def stroke(first, last, sequence="<Button-1>", y=100):
+            def key_x(note):
+                x1, _, x2, _ = window.canvas.coords(window.keys[note])
+                return round((x1 + x2) / 2 - window.canvas.canvasx(0))
+            x1, x2 = key_x(first), key_x(last)
+            motion = sequence.replace("Button-", "B").replace(">", "-Motion>")
+            window.canvas.event_generate(sequence, x=x1, y=y)
+            # A single jump must cover all intervening keys, like a fast drag.
+            window.canvas.event_generate(motion, x=x2, y=y)
+            assert window.mouse_note == last, "Drag did not depress the current key"
+            window.canvas.event_generate(sequence.replace("Button-", "ButtonRelease-"), x=x2, y=y)
+            assert window.stroke_erase is None and window.mouse_note is None, "Release did not end the stroke"
+            before = set(window.selected)
+            window.canvas.event_generate(motion, x=key_x(69), y=y)
+            assert window.selected == before, "Motion after release continued painting"
+
         def check_erase_and_close():
             try:
                 assert 67 not in window.selected, "Physical-key erase mode was not handled"
@@ -605,6 +657,31 @@ def smoke_test(args):
                 window.presets["Blue"].invoke()
                 assert window.color == "0050FF", "Blue preset did not change the brush"
                 window.paint_radio.invoke()
+                stroke(60, 67)
+                white_notes = {60, 62, 64, 65, 67}
+                assert window.selected == white_notes, "Fast white-key drag skipped keys or painted black keys"
+                window.erase_radio.invoke()
+                stroke(67, 60)
+                assert not window.selected, "Erase drag did not remove all crossed keys"
+                stroke(60, 67, window.secondary_click)
+                assert window.selected == white_notes and window.paint_mode.get() == "erase", "Right-drag did not invert Erase"
+                window.paint_radio.invoke()
+                stroke(67, 60, window.secondary_click)
+                assert not window.selected, "Right-drag did not invert Paint"
+                stroke(60, 64, y=40)
+                assert window.selected == set(range(60, 65)), "Drag did not follow black and white key hit-testing"
+                if root.tk.call("tk", "windowingsystem") == "aqua":
+                    stroke(64, 60, "<Control-Button-1>", y=40)
+                    assert not window.selected, "Mac Control-drag did not erase"
+                else:
+                    stroke(64, 60, window.secondary_click, y=40)
+                # Losing focus also ends a stroke before any later motion.
+                x1, _, x2, _ = window.canvas.coords(window.keys[60])
+                x = round((x1 + x2) / 2 - window.canvas.canvasx(0))
+                window.canvas.event_generate("<Button-1>", x=x, y=100)
+                root.event_generate("<FocusOut>")
+                assert window.stroke_erase is None and window.mouse_note is None, "Focus loss retained a drag stroke"
+                window.clear()
                 pointer(60, "<Button-1>")
                 assert window.note_colors[60] == "0050FF", "Left-click did not follow Paint mode"
                 pointer(61, "<Button-1>", y=40)
