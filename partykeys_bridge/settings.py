@@ -62,7 +62,11 @@ def prepare_app_config():
         load(path, required=True)
         return
     seed = app.parent / "config.json"
-    config = load(seed) if seed.is_file() else deepcopy(DEFAULTS)
+    try:
+        config = load(seed) if seed.is_file() else deepcopy(DEFAULTS)
+    except ValueError as error:
+        LOG.warning("Could not import %s; starting with defaults: %s", seed, error)
+        config = deepcopy(DEFAULTS)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with path.open("x", encoding="utf-8") as stream:

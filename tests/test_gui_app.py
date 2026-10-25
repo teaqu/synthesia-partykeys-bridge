@@ -60,6 +60,14 @@ class GuiAppTests(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(path.read_text(), "invalid JSON")
 
+    def test_invalid_sibling_config_does_not_block_first_launch(self):
+        seed = self.app.parent / "config.json"
+        seed.write_text("invalid JSON")
+        with self.assertLogs("partykeys", level="WARNING"):
+            settings.prepare_app_config()
+        self.assertEqual(settings.load(settings.default_path()), settings.DEFAULTS)
+        self.assertEqual(seed.read_text(), "invalid JSON")
+
     def test_finder_defaults_to_gui_and_explicit_config_is_preserved(self):
         argv = ["--config", str(self.root / "custom.json")]
         Path(argv[1]).write_text("{}")
