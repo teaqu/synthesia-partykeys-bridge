@@ -1,13 +1,16 @@
 """Small Tk interface shared by Windows, macOS and desktop Linux."""
 from copy import copy
+from collections import deque
 import json
 import logging
 from pathlib import Path
 import queue
 import threading
 import tempfile
+import time
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox
+from tkinter.scrolledtext import ScrolledText
 
 from . import settings
 from .practice import note_name, LiveLighting
@@ -68,7 +71,7 @@ class StatusHandler(logging.Handler):
         self.events = events
 
     def emit(self, record):
-        self.events.put(record.getMessage())
+        self.events.put((record.getMessage(), self.format(record)))
 
 
 def save_config(path, practice, hand_colors, trail=None, bridge_brightness=None, bridge_enabled=None):
@@ -128,10 +131,15 @@ class Window:
         self.worker = None
         self.stop = threading.Event()
         self.events = queue.SimpleQueue()
+        self.log_history = deque(maxlen=1000)
+        self.log_window = None
+        self.log_text = None
         self.log_handler = StatusHandler(self.events)
+        self.log_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
         logging.getLogger("partykeys").addHandler(self.log_handler)
         self.saving = None
         self.closing = False
+        self.layout_pending = False
         root.title("PartyKeys · Practice lights")
         root.geometry("820x650")
         root.minsize(740, 650)
@@ -207,11 +215,13 @@ class Window:
         ttk.Label(row, text="Synthesia colours:").pack(side="left")
         for hand in ("left", "right"):
             ttk.Button(row, text=hand.title() + " hand…", command=lambda h=hand: self.pick_hand(h)).pack(side="left", padx=5)
-        self.toggle = ttk.Button(row, text="Start bridge", command=self.toggle_bridge)
+        self.toggle = ttk.Button(row, text="Connect keyboard", command=self.toggle_bridge)
         self.toggle.pack(side="right")
+        self.log_button = ttk.Button(row, text="Logs…", command=self.show_logs)
+        self.log_button.pack(side="right", padx=(0, 8))
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=(8, 0))
-        self.bridge_enable_toggle = ttk.Checkbutton(row, text="Enable bridge lights", variable=self.bridge_enabled,
+        self.bridge_enable_toggle = ttk.Checkbutton(row, text="Enable Synthesia lights", variable=self.bridge_enabled,
                                                     command=self.changed)
         self.bridge_enable_toggle.pack(side="left")
         ttk.Label(row, text="Brightness").pack(side="left", padx=(12, 0))
@@ -235,9 +245,12 @@ class Window:
         ttk.Scale(row, from_=0, to=100, variable=self.trail_brightness,
                   command=lambda _: self.changed()).pack(side="left", fill="x", expand=True, padx=12)
         ttk.Label(row, textvariable=self.trail_percent, width=5).pack(side="right")
-        ttk.Label(frame, textvariable=self.status, wraplength=720).pack(anchor="w", pady=(10, 0))
+        self.status_label = ttk.Label(frame, textvariable=self.status, wraplength=704)
+        self.status_label.pack(anchor="w", pady=(10, 0))
         self.footer = ttk.Label(frame, text="In Synthesia: Music Output → Synthesia Lights → Key Lights → Finger-based channel.", wraplength=720)
         self.footer.pack(anchor="w", pady=(5, 0))
+        self.status.trace_add("write", lambda *_: self.schedule_layout())
+        root.bind("<Configure>", lambda event: self.schedule_layout() if event.widget == root else None, add=True)
         self.refresh()
         self.push_live()
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -245,6 +258,25 @@ class Window:
         # Hardware is only opened by the bridge owned by this window.
         if auto_start:
             root.after(200, self.start_bridge)
+
+    def schedule_layout(self):
+        if not self.layout_pending and not self.closing:
+            self.layout_pending = True
+            self.root.after_idle(self.fit_status)
+
+    def fit_status(self):
+        if self.closing:
+            self.layout_pending = False
+            return
+        width = max(704, self.root.winfo_width() - 36)
+        self.status_label.configure(wraplength=width)
+        self.footer.configure(wraplength=width)
+        self.root.update_idletasks()
+        height = max(650, self.root.winfo_reqheight())
+        self.root.minsize(740, height)
+        if self.root.winfo_height() < height:
+            self.root.geometry(f"{max(740, self.root.winfo_width())}x{height}")
+        self.layout_pending = False
 
     def draw_keyboard(self):
         white = 0
@@ -486,19 +518,19 @@ class Window:
             try:
                 execute(args)
             except Exception as error:
-                self.events.put(f"Bridge stopped: {error}")
+                self.events.put(f"Connection stopped: {error}")
             else:
-                self.events.put("Bridge stopped · Lights cleared")
+                self.events.put("Disconnected · All keyboard lights cleared")
         self.worker = threading.Thread(target=work, name="partykeys-bridge", daemon=False)
         self.worker.start()
-        self.toggle.configure(text="Stop bridge")
-        self.status.set("Bridge running · Waiting for keyboard / Synthesia. Stop other bridge instances first.")
+        self.toggle.configure(text="Disconnect keyboard")
+        self.status.set("Connected · Practice and Synthesia lights can be enabled independently.")
 
     def toggle_bridge(self):
         if self.worker and self.worker.is_alive():
             self.stop.set()
             self.toggle.configure(state="disabled")
-            self.status.set("Stopping · Clearing lights…")
+            self.status.set("Disconnecting · Clearing all keyboard lights…")
         else:
             self.start_bridge()
 
@@ -513,15 +545,53 @@ class Window:
         if self.pressed != previous:
             self.refresh()
 
+    def drain_status_events(self):
+        while not self.events.empty():
+            event = self.events.get()
+            message, detail = event if isinstance(event, tuple) else (event, event)
+            self.status.set(message)
+            line = f"{time.strftime('%H:%M:%S')} {detail}"
+            self.log_history.append(line)
+            if self.log_text is not None:
+                follow = self.log_text.yview()[1] >= .99
+                self.log_text.configure(state="normal")
+                self.log_text.insert("end", line + "\n")
+                total = int(self.log_text.index("end-1c").split(".")[0])
+                if total > 2000:
+                    self.log_text.delete("1.0", f"{total - 2000 + 1}.0")
+                self.log_text.configure(state="disabled")
+                if follow:
+                    self.log_text.see("end")
+
+    def show_logs(self):
+        self.drain_status_events()
+        if self.log_window is not None:
+            self.log_window.lift()
+            return
+        self.log_window = tk.Toplevel(self.root)
+        self.log_window.title("PartyKeys · Logs")
+        self.log_window.geometry("760x420")
+        self.log_window.minsize(460, 240)
+        self.log_text = ScrolledText(self.log_window, wrap="word", font="TkFixedFont")
+        self.log_text.pack(fill="both", expand=True, padx=12, pady=12)
+        self.log_text.insert("end", "\n".join(self.log_history) + ("\n" if self.log_history else ""))
+        self.log_text.configure(state="disabled")
+        self.log_text.see("end")
+        self.log_window.protocol("WM_DELETE_WINDOW", self.close_logs)
+
+    def close_logs(self):
+        if self.log_window is not None:
+            self.log_window.destroy()
+        self.log_window = self.log_text = None
+
     def poll(self):
         self.drain_key_events()
-        while not self.events.empty():
-            self.status.set(self.events.get())
+        self.drain_status_events()
         if self.worker and not self.worker.is_alive():
             if self.pressed:
                 self.pressed.clear()
                 self.refresh()
-            self.toggle.configure(text="Start bridge", state="normal")
+            self.toggle.configure(text="Connect keyboard", state="normal")
         if self.closing and (not self.worker or not self.worker.is_alive()):
             logging.getLogger("partykeys").removeHandler(self.log_handler)
             self.root.destroy()
@@ -646,6 +716,21 @@ def smoke_test(args):
                 assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
                 assert window.bridge_scale.winfo_ismapped(), "Bridge brightness control was not laid out"
                 assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Brightness row clipped the window footer"
+                window.log_handler.handle(logging.LogRecord("partykeys", logging.INFO, __file__, 0, "Smoke log entry", (), None))
+                window.log_button.invoke()
+                assert "INFO: Smoke log entry" in window.log_text.get("1.0", "end"), "Logs did not show earlier output"
+                window.events.put("Smoke worker status")
+                window.drain_status_events()
+                assert "Smoke worker status" in window.log_text.get("1.0", "end"), "Logs did not update live"
+                window.close_logs()
+                window.show_logs()
+                assert "Smoke log entry" in window.log_text.get("1.0", "end"), "Closing logs lost history"
+                window.close_logs()
+                window.status.set("First status line\nSecond status line\n" + "Long wrapped connection detail. " * 8)
+                root.update_idletasks()
+                assert window.status_label.winfo_height() >= window.status_label.winfo_reqheight(), "Multiline status text was clipped"
+                assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Multiline status clipped the footer"
+                window.status.set("Ready")
                 assert window.swatch.winfo_ismapped(), "Custom colour button was not laid out"
                 for button in window.presets.values():
                     assert button.winfo_ismapped(), "Preset colour button was not laid out"
@@ -774,5 +859,9 @@ def smoke_test(args):
             except tk.TclError:
                 pass
         if failures:
+            if getattr(args, "smoke_result", None):
+                Path(args.smoke_result).write_text(json.dumps({"passed": False, "errors": failures}))
             raise RuntimeError("GUI smoke test failed: " + "; ".join(failures))
+        if getattr(args, "smoke_result", None):
+            Path(args.smoke_result).write_text(json.dumps({"passed": True}))
         print("PASS: GUI launched, controls painted/erased keys, keyboard capture and trail settings saved, window closed; no MIDI opened", flush=True)

@@ -90,6 +90,7 @@ def parser():
         sub.add_argument("--dry-run", action="store_true", help="Print LED SysEx; do not open hardware outputs")
         if mode == "gui":
             sub.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
+            sub.add_argument("--smoke-result", help=argparse.SUPPRESS)
         if mode == "test":
             sub.add_argument("--note", type=int, default=60)
             sub.add_argument("--color", type=color, default=(0, 80, 255))
@@ -361,13 +362,14 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     args = parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if getattr(args, "debug", False) else logging.INFO,
-                        format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
+                        format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S",
+                        handlers=[logging.StreamHandler(sys.stderr)] if sys.stderr is not None else [logging.NullHandler()])
     previous = signal.getsignal(signal.SIGTERM)
     def stop(signum, frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)
     try:
-        if args.command in ("bridge", "gui"):
+        if args.command in ("bridge", "gui") and not getattr(args, "smoke_test", False):
             args.startup_argv = argv
             config_required = bool(args.config)
             config_path = args.config or settings.default_path()
@@ -386,7 +388,7 @@ def main(argv=None):
         print("Stopped; LED cleanup attempted.")
         return 0
     except (OSError, EOFError, ValueError, RuntimeError, ImportError) as error:
-        print(f"Error: {error}", file=sys.stderr)
+        LOG.error("Error: %s", error)
         return 1
     finally:
         signal.signal(signal.SIGTERM, previous)
