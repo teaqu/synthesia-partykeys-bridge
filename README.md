@@ -71,7 +71,7 @@ Enable **Use physical keyboard to paint / erase** to apply the selected mode
 by playing your physical keyboard; turn this off for normal
 practice. Releasing a key does not erase its saved practice colour.
 
-Selected keys show a check mark and retain their saved colour. Physically held
+Selected keys retain their saved colour. Physically held
 keys look pushed down, with a darker face, inset shadow, and lowered label, even
 when **Use physical keyboard to paint / erase** is off. This lets you identify
 pitches without editing the selection. The view scrolls to reveal keys you play,
