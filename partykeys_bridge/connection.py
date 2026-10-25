@@ -181,9 +181,11 @@ class BridgeConnection:
         if live is not None:
             generation, value = live.snapshot()
             if value is not None and generation != self.live_generation:
-                practice, trail, self.practice_erase = value
+                practice, trail, self.practice_erase, brightness, enabled = value
                 self.bridge.set_practice(practice)
                 self.bridge.set_trail(trail)
+                self.bridge.set_brightness(brightness)
+                self.bridge.enabled = enabled
                 self.live_generation = generation
         if self.now() >= self.next_scan:
             self.next_scan = self.now() + 1

@@ -1,6 +1,7 @@
 """Synthesia finger-based key-light messages, not ordinary performance MIDI."""
 from .practice import practice_lights
 from .practice import ExactRGB
+import math
 import time
 LEFT_CHANNELS = {1, 2, 3, 4, 5, 11}  # Mido uses zero-based channels.
 RIGHT_CHANNELS = {0, 6, 7, 8, 9, 10, 12}
@@ -21,6 +22,13 @@ class Bridge:
         self.now = now or time.monotonic
         self.trail = {"enabled": False, "duration_seconds": 1.5, "max_brightness": .35}
         self.released = {}
+        self.brightness = 1.0
+        self.enabled = True
+
+    def set_brightness(self, value):
+        if not math.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError("Bridge brightness must be between 0 and 1")
+        self.brightness = value
 
     def set_trail(self, config):
         self.trail = {"max_brightness": .35, **config}
@@ -95,6 +103,8 @@ class Bridge:
 
     def lights(self):
         lights = practice_lights(self.practice)
+        if not self.enabled:
+            return lights
         now = self.now()
         for note, (released_at, color) in list(self.released.items()):
             duration = self.trail["duration_seconds"]
@@ -111,5 +121,12 @@ class Bridge:
             if not any(faded):
                 continue
             lights[note] = ExactRGB(max(a, b) for a, b in zip(lights.get(note, (0, 0, 0)), faded))
-        lights.update(self._cue_lights())
+        cues = self._cue_lights()
+        if self.brightness < 1:
+            # Firmware palette colours have fixed brightness. Use per-key RGB
+            # for dimmed cues, preserving palette output at the default 100%.
+            cues = {note: ExactRGB(round(v * self.brightness) for v in rgb)
+                    for note, rgb in cues.items()}
+            cues = {note: rgb for note, rgb in cues.items() if any(rgb)}
+        lights.update(cues)
         return lights

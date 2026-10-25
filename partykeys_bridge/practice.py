@@ -10,10 +10,10 @@ class LiveLighting:
         self.generation = 0
         self.value = None
 
-    def publish(self, practice, trail, erase=False):
+    def publish(self, practice, trail, erase=False, bridge_brightness=1.0, bridge_enabled=True):
         with self.lock:
             self.generation += 1
-            self.value = (deepcopy(practice), dict(trail), erase)
+            self.value = (deepcopy(practice), dict(trail), erase, bridge_brightness, bridge_enabled)
 
     def snapshot(self):
         with self.lock:

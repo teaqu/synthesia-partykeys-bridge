@@ -32,6 +32,22 @@ class Device:
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_live_bridge_brightness_changes_an_existing_cue_without_config_io(self):
+        from partykeys_bridge.practice import LiveLighting
+        live = self.session.args.live_lighting = LiveLighting()
+        self.session.bridge.receive(mido.Message("note_on", channel=1, note=60))
+        live.publish(self.session.bridge.practice, self.session.bridge.trail, bridge_brightness=.25)
+        self.step()
+        self.assertEqual(self.session.bridge.brightness, .25)
+        self.assertEqual(self.session.bridge.lights()[60], (64, 64, 0))
+        live.publish(self.session.bridge.practice, self.session.bridge.trail,
+                     bridge_brightness=.25, bridge_enabled=False)
+        self.session.tick()
+        self.assertFalse(self.session.bridge.lights())
+        live.publish(self.session.bridge.practice, self.session.bridge.trail, bridge_brightness=.25)
+        self.session.tick()
+        self.assertEqual(self.session.bridge.lights()[60], (64, 64, 0))
+
     def test_gui_receives_physical_keys_without_paint_capture_and_clears_on_disconnect(self):
         events = self.session.args.physical_key_events = queue.SimpleQueue()
         self.step()

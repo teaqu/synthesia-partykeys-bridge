@@ -71,12 +71,16 @@ class StatusHandler(logging.Handler):
         self.events.put(record.getMessage())
 
 
-def save_config(path, practice, hand_colors, trail=None):
+def save_config(path, practice, hand_colors, trail=None, bridge_brightness=None, bridge_enabled=None):
     """Preserve other settings and replace atomically so reload never sees half JSON."""
     path = Path(path)
     config = settings.load(path)
     config["practice"] = practice
     config["lighting"].update(hand_colors)
+    if bridge_brightness is not None:
+        config["lighting"]["bridge_brightness"] = bridge_brightness
+    if bridge_enabled is not None:
+        config["lighting"]["bridge_enabled"] = bridge_enabled
     if trail is not None:
         config["trail"] = trail
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -109,6 +113,9 @@ class Window:
         self.trail_seconds = tk.StringVar(value=str(config["trail"]["duration_seconds"]))
         self.trail_brightness = tk.DoubleVar(value=config["trail"]["max_brightness"] * 100)
         self.trail_percent = tk.StringVar()
+        self.bridge_brightness = tk.DoubleVar(value=config["lighting"]["bridge_brightness"] * 100)
+        self.bridge_percent = tk.StringVar()
+        self.bridge_enabled = tk.BooleanVar(value=config["lighting"]["bridge_enabled"])
         self.hand_colors = {hand + "_color": config["lighting"][hand + "_color"] for hand in ("left", "right")}
         self.enabled = tk.BooleanVar(value=config["practice"]["enabled"])
         self.brightness = tk.DoubleVar(value=config["practice"]["brightness"] * 100)
@@ -162,7 +169,7 @@ class Window:
                         command=self.set_capture).pack(side="left", padx=10)
         row = ttk.Frame(frame)
         row.pack(fill="x", pady=10)
-        ttk.Label(row, text="Brightness").pack(side="left")
+        ttk.Label(row, text="Practice brightness").pack(side="left")
         ttk.Scale(row, from_=0, to=100, variable=self.brightness, command=lambda _: self.changed()).pack(side="left", fill="x", expand=True, padx=12)
         ttk.Label(row, textvariable=self.percent, width=5).pack(side="right")
         self.canvas = tk.Canvas(frame, height=132, background="#e6e8ec", highlightthickness=0)
@@ -199,6 +206,16 @@ class Window:
         self.toggle = ttk.Button(row, text="Start bridge", command=self.toggle_bridge)
         self.toggle.pack(side="right")
         row = ttk.Frame(frame)
+        row.pack(fill="x", pady=(8, 0))
+        self.bridge_enable_toggle = ttk.Checkbutton(row, text="Enable bridge lights", variable=self.bridge_enabled,
+                                                    command=self.changed)
+        self.bridge_enable_toggle.pack(side="left")
+        ttk.Label(row, text="Brightness").pack(side="left", padx=(12, 0))
+        self.bridge_scale = ttk.Scale(row, from_=0, to=100, variable=self.bridge_brightness,
+                                     command=lambda _: self.changed())
+        self.bridge_scale.pack(side="left", fill="x", expand=True, padx=12)
+        ttk.Label(row, textvariable=self.bridge_percent, width=5).pack(side="right")
+        row = ttk.Frame(frame)
         row.pack(fill="x", pady=(12, 0))
         ttk.Checkbutton(row, text="Trail mode", variable=self.trail_enabled, command=self.changed).pack(side="left")
         ttk.Label(row, text="Fade duration:").pack(side="left", padx=(12, 6))
@@ -215,7 +232,8 @@ class Window:
                   command=lambda _: self.changed()).pack(side="left", fill="x", expand=True, padx=12)
         ttk.Label(row, textvariable=self.trail_percent, width=5).pack(side="right")
         ttk.Label(frame, textvariable=self.status, wraplength=720).pack(anchor="w", pady=(10, 0))
-        ttk.Label(frame, text="In Synthesia: Music Output → Synthesia Lights → Key Lights → Finger-based channel.", wraplength=720).pack(anchor="w", pady=(5, 0))
+        self.footer = ttk.Label(frame, text="In Synthesia: Music Output → Synthesia Lights → Key Lights → Finger-based channel.", wraplength=720)
+        self.footer.pack(anchor="w", pady=(5, 0))
         self.refresh()
         self.push_live()
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -362,6 +380,7 @@ class Window:
                 self.canvas.itemconfigure(marker, state="normal" if down else "hidden")
         self.swatch.set_color(self.color)
         self.percent.set(f"{round(self.brightness.get())}%")
+        self.bridge_percent.set(f"{round(self.bridge_brightness.get())}%")
         self.trail_percent.set(f"{round(self.trail_brightness.get())}%")
         names = ", ".join(note_name(n) for n in sorted(held or self.selected))
         prefix = f"{len(self.selected)} selected" + (f" · {len(held)} held" if held else "")
@@ -386,7 +405,9 @@ class Window:
             practice, trail = self.lighting_values()
             if not .25 <= trail["duration_seconds"] <= 30:
                 return
-            self.live_lighting.publish(practice, trail, self.paint_mode.get() == "erase")
+            self.live_lighting.publish(practice, trail, self.paint_mode.get() == "erase",
+                                       bridge_brightness=round(self.bridge_brightness.get() / 100, 3),
+                                       bridge_enabled=self.bridge_enabled.get())
         except ValueError:
             pass  # An incomplete spinbox edit must not interrupt live lighting.
 
@@ -394,7 +415,9 @@ class Window:
         self.saving = None
         try:
             practice, trail = self.lighting_values()
-            config = save_config(self.path, practice, self.hand_colors, trail)
+            config = save_config(self.path, practice, self.hand_colors, trail,
+                                 bridge_brightness=round(self.bridge_brightness.get() / 100, 3),
+                                 bridge_enabled=self.bridge_enabled.get())
             self.status.set("Saved · Changes apply live" if config["live_reload"] else "Saved · Restart bridge to apply (live reload disabled)")
             return True
         except (OSError, ValueError) as error:
@@ -539,10 +562,15 @@ def smoke_test(args):
         def check_erase_and_close():
             try:
                 assert 67 not in window.selected, "Physical-key erase mode was not handled"
+                window.bridge_enable_toggle.invoke()
+                assert not window.bridge_enabled.get(), "Bridge lights did not disable"
+                assert not window.live_lighting.snapshot()[1][4], "Bridge disable was not published live"
                 assert window.save(), "GUI settings did not save"
                 saved = settings.load(args.config, required=True)
                 assert saved["practice"]["note_colors"] == {"64": "FF0000"}
                 assert saved["trail"] == dict(enabled=True, duration_seconds=12., max_brightness=.25)
+                assert saved["lighting"]["bridge_brightness"] == .4, "Bridge brightness did not save"
+                assert not saved["lighting"]["bridge_enabled"], "Bridge enable preference did not save"
                 assert window.worker is None, "GUI smoke test opened a MIDI worker"
                 window.close()
             except Exception as error:
@@ -558,9 +586,12 @@ def smoke_test(args):
                 window.key_events.put(67)
                 window.trail_enabled.set(True)
                 window.trail_brightness.set(25)
+                window.bridge_brightness.set(40)
                 window.trail_seconds.set("12")
                 window.changed()
                 assert window.trail_percent.get() == "25%", "Trail brightness control did not update"
+                assert window.bridge_percent.get() == "40%", "Bridge brightness control did not update"
+                assert window.live_lighting.snapshot()[1][3] == .4, "Bridge brightness was not published live"
                 root.after(100, check_erase_and_close)
             except Exception as error:
                 fail(error)
@@ -570,6 +601,8 @@ def smoke_test(args):
                 assert root.winfo_viewable(), "GUI window did not become visible"
                 assert window.canvas.winfo_width() > 100, "Keyboard canvas was not laid out"
                 assert window.duration.winfo_ismapped(), "Trail controls were not laid out"
+                assert window.bridge_scale.winfo_ismapped(), "Bridge brightness control was not laid out"
+                assert window.footer.winfo_rooty() + window.footer.winfo_height() <= root.winfo_rooty() + root.winfo_height(), "Brightness row clipped the window footer"
                 assert window.swatch.winfo_ismapped(), "Custom colour button was not laid out"
                 for button in window.presets.values():
                     assert button.winfo_ismapped(), "Preset colour button was not laid out"
@@ -634,6 +667,12 @@ def smoke_test(args):
                 assert window.canvas.coords(window.key_labels[60])[1] == 117, "Pressed key label did not move down"
                 assert window.canvas.itemcget(window.selection_marks[60], "state") == "normal", "Selected key has no check mark"
                 assert window.canvas.itemcget(window.held_marks[61][1], "state") == "normal", "Black pressed key has no inset shadow"
+                window.bridge_enable_toggle.invoke()
+                assert not window.bridge_enabled.get(), "Bridge lights did not disable"
+                assert window.canvas.coords(window.keys[60])[1] == 4, "Bridge disable hid physical GUI feedback"
+                assert window.selected == {60, 64}, "Bridge disable changed practice selection"
+                window.bridge_enable_toggle.invoke()
+                assert window.bridge_enabled.get(), "Bridge lights did not enable"
                 physical(mido.Message("note_off", note=60, channel=0))
                 assert 60 in window.held_notes, "Releasing one channel released another channel's held key"
                 physical(mido.Message("note_on", note=60, channel=1, velocity=0))

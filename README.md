@@ -57,7 +57,16 @@ Choose one of the eight preset colours or use **Practice colour** for a custom
 colour, then choose **Paint** or **Erase**. Left-click follows the selected mode;
 right-click temporarily does the opposite (Control-click works too on macOS).
 The selected mode stays unchanged after right-clicking. Each key keeps its own
-colour when you change the brush. Brightness applies to all practice keys.
+colour when you change the brush. **Practice brightness** applies to all practice keys.
+
+**Bridge brightness** controls Synthesia's active key lights from 0–100% (100%
+by default). Changes apply live, including to keys already lit, and are saved
+for the next launch. Practice brightness and trail maximum brightness remain
+independent. Below 100%, the bridge uses per-key RGB to dim the hardware's
+otherwise fixed-brightness palette colours.
+Turn off **Enable bridge lights** to hide Synthesia cues and their trails on the
+physical keyboard. Practice lights and GUI pressed-key feedback keep working.
+Re-enable it to restore the current cues. This setting is also saved.
 Enable **Use physical keyboard to paint / erase** to apply the selected mode
 by playing your physical keyboard; turn this off for normal
 practice. Releasing a key does not erase its saved practice colour.
@@ -80,7 +89,7 @@ trails immediately. RGB updates are paced by the keyboard protocol, so large
 chords can fade in visible steps rather than smoothly.
 
 Click white or black keys to select the exact pitches to keep lit. Scroll to other
-octaves, choose **Practice colour**, and adjust **Brightness** (8% by default).
+octaves, choose **Practice colour**, and adjust **Practice brightness** (8% by default).
 Uncheck **Enable practice lights** to disable the background without losing your
 selection. **Clear selection** removes all selected notes. Changes save automatically
 to `config.json`; GUI changes apply immediately while the bridge runs.
@@ -175,7 +184,7 @@ The screenshot shows the port after clicking **+**, with MIDI traffic passing th
 
 - **Shifted lights, missing low notes, or playing the right keyboard paints the left:** the app may have started after the keyboard was already octave-shifted. Keep the bridge running and use the physical octave buttons to select the desired octave; each press reports the resulting octave and resyncs both Synthesia and practice-light routing. To return to the same octave, move one step away from the current setting and back (choose a direction that is not already at its limit). Starting the bridge assumes octave zero until it receives an octave report.
 - **A joined keyboard is still missing after octave resync:** stop the app and unplug the MIDI/USB cable. Detach and reattach the joined keyboard, reconnect USB, then restart the app. If the octave is already shifted, resync it using the octave buttons while the bridge runs.
-- **No practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Brightness**. Choose pitches available on your connected keyboard.
+- **No practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Practice brightness**. Choose pitches available on your connected keyboard.
 - **Playing keys does not assign colours:** enable **Use physical keyboard to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
 - **Missing lights on joined boards:** check the connections and octave settings, then reconnect the keyboard. Notes outside the connected boards' range cannot light up.
@@ -301,6 +310,8 @@ Both platform launchers read **config.json** beside the executable. Edit it with
 - `palette` gives names to six-digit RGB values. For example, `"purple": "B400FF"`.
 - `lighting.left_color` and `lighting.right_color` accept a palette name or a six-digit RGB value. Defaults are left blue and right green.
 - `lighting.rgb_brightness`: 0 to 1, only for the `rgb15` protocol. It does not scale palette brightness.
+- `lighting.bridge_brightness`: 0 to 1 for active Synthesia cues (default 1). The GUI's **Bridge brightness** slider saves this value; dimmed cues use per-key RGB even in palette mode. It leaves practice and trail brightness unchanged.
+- `lighting.bridge_enabled`: enables Synthesia cues and their trails (default `true`), independently of practice lights and physical-input display.
 - `midi.create_virtual_input`, `midi.input`, and `midi.palette_interval_ms` control automatic port creation, cue-port name, and packet pacing. Changes to the `midi` section require a bridge restart.
 - `live_reload`: set to `false` to disable live config updates. Restart after re-enabling it. `poll_interval_ms` controls how often the config is checked (100–10000 ms).
 

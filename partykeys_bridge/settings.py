@@ -14,7 +14,7 @@ DEFAULTS = {
     "palette": {"blue": "0050FF", "green": "00FF00", "red": "FF0000", "orange": "FF6400",
                 "yellow": "FFFF00", "purple": "B400FF", "cyan": "00FFB4"},
     "lighting": {"left_color": "blue", "right_color": "green",
-                 "rgb_brightness": 1.0},
+                 "rgb_brightness": 1.0, "bridge_brightness": 1.0, "bridge_enabled": True},
     "midi": {"create_virtual_input": True, "input": "Synthesia Lights",
              "palette_interval_ms": 1},
     "practice": {"enabled": False, "notes": [], "color": "0050FF", "brightness": 0.08, "note_colors": {}},
@@ -66,6 +66,7 @@ def load(path, required=False):
     if type(config["version"]) is not int or config["version"] != 1:
         raise ValueError("Unsupported config version")
     for section, key in ((None, "live_reload"),
+                         ("lighting", "bridge_enabled"),
                          ("midi", "create_virtual_input")):
         if type((config if section is None else config[section])[key]) is not bool:
             raise ValueError(f"{key} must be true or false")
@@ -78,9 +79,10 @@ def load(path, required=False):
         rgb(value)
     for key in ("left_color", "right_color"):
         resolve_color(config["lighting"][key], config["palette"])
-    brightness = config["lighting"]["rgb_brightness"]
-    if type(brightness) not in (int, float) or not math.isfinite(brightness) or not 0 <= brightness <= 1:
-        raise ValueError("lighting.rgb_brightness must be between 0 and 1")
+    for key in ("rgb_brightness", "bridge_brightness"):
+        brightness = config["lighting"][key]
+        if type(brightness) not in (int, float) or not math.isfinite(brightness) or not 0 <= brightness <= 1:
+            raise ValueError(f"lighting.{key} must be between 0 and 1")
     practice = config["practice"]
     if type(practice["enabled"]) is not bool:
         raise ValueError("practice.enabled must be true or false")
@@ -119,6 +121,8 @@ def explicit(argv, option):
 
 
 def apply_startup(args, config, argv):
+    args.bridge_brightness = config["lighting"]["bridge_brightness"]
+    args.bridge_enabled = config["lighting"]["bridge_enabled"]
     mappings = (("--virtual-input", "virtual_input", config["midi"]["create_virtual_input"]),
                 ("--input", "input", config["midi"]["input"]),
                 ("--palette-interval-ms", "palette_interval_ms", config["midi"]["palette_interval_ms"]),
@@ -171,7 +175,8 @@ class ConfigWatcher:
             self.practice_pending.get_nowait()
         except queue.Empty:
             pass
-        self.practice_pending.put_nowait((config["practice"], config["trail"]))
+        self.practice_pending.put_nowait((config["practice"], config["trail"],
+                                         config["lighting"]["bridge_brightness"], config["lighting"]["bridge_enabled"]))
 
     def start(self):
         if self.thread or not self.config["live_reload"]:
@@ -186,10 +191,12 @@ class ConfigWatcher:
 
     def apply(self, session):
         try:
-            practice, trail = self.practice_pending.get_nowait()
+            practice, trail, brightness, enabled = self.practice_pending.get_nowait()
             if getattr(session.args, "live_lighting", None) is None:
                 session.bridge.set_practice(practice)
                 session.bridge.set_trail(trail)
+                session.bridge.set_brightness(brightness)
+                session.bridge.enabled = enabled
         except queue.Empty:
             pass
         try:

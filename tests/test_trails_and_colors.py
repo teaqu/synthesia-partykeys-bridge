@@ -16,6 +16,64 @@ from partykeys_bridge.driver import PalettePartyKeys
 
 
 class TrailAndColorTests(unittest.TestCase):
+    def test_disabling_bridge_hides_cues_and_trails_but_keeps_practice_and_input_state(self):
+        now = [0.]
+        bridge = Bridge(left=(0, 255, 0), now=lambda: now[0])
+        bridge.set_practice(dict(enabled=True, notes=[60], color="FF0000", brightness=.1))
+        bridge.set_trail(dict(enabled=True, duration_seconds=2., max_brightness=.2))
+        bridge.receive(mido.Message("note_on", channel=1, note=64))
+        bridge.receive(mido.Message("note_off", note=64))
+        bridge.receive(mido.Message("note_on", channel=1, note=60))
+        bridge.enabled = False
+        self.assertEqual(bridge.lights(), {60: (26, 0, 0)})
+        bridge.enabled = True
+        self.assertEqual(bridge.lights()[60], (0, 255, 0))
+        self.assertEqual(bridge.lights()[64], (0, 51, 0))
+        bridge.enabled = False
+        bridge.receive(mido.Message("note_off", note=60))
+        now[0] = 3.
+        bridge.enabled = True
+        self.assertFalse(bridge.active)
+        self.assertEqual(bridge.lights(), {60: (26, 0, 0)})
+
+    def test_bridge_brightness_updates_held_cues_without_dimming_background_layers(self):
+        bridge = Bridge(left=(0, 255, 0), now=lambda: 0.)
+        bridge.set_practice(dict(enabled=True, notes=[60], color="FF0000", brightness=.1))
+        bridge.set_trail(dict(enabled=True, duration_seconds=2., max_brightness=.2))
+        bridge.receive(mido.Message("note_on", channel=1, note=64))
+        bridge.receive(mido.Message("note_off", note=64))
+        bridge.receive(mido.Message("note_on", channel=1, note=60))
+        original = bridge.lights()[60]
+        self.assertNotIsInstance(original, ExactRGB)
+        bridge.set_brightness(.4)
+        self.assertEqual(bridge.lights()[60], (0, 102, 0))
+        self.assertIsInstance(bridge.lights()[60], ExactRGB)
+        self.assertEqual(bridge.lights()[64], (0, 51, 0))
+        bridge.set_brightness(0)
+        self.assertEqual(bridge.lights()[60], (26, 0, 0))
+        self.assertEqual(bridge.lights()[64], (0, 51, 0))
+        bridge.set_brightness(1)
+        self.assertEqual(bridge.lights()[60], original)
+        self.assertNotIsInstance(bridge.lights()[60], ExactRGB)
+        self.assertEqual(bridge.counts, {(1, 60): 1})
+
+    def test_dimmed_bridge_cues_use_rgb_instead_of_fixed_brightness_palette(self):
+        now, sent = [0.], []
+        driver = PalettePartyKeys(SimpleNamespace(send=sent.append), boards=[(1, 63, 48)],
+                                  now=lambda: now[0], sleep=lambda t: now.__setitem__(0, now[0] + t))
+        driver.initialize()
+        bridge = Bridge(left=(0, 255, 0))
+        bridge.receive(mido.Message("note_on", channel=1, note=60))
+        driver.show(bridge.lights(), force=True)
+        self.assertEqual(sent[-1].data[6], 0x71)
+        bridge.set_brightness(.2)
+        driver.show(bridge.lights(), force=True)
+        self.assertEqual(sent[-1].data[6], 0x15)
+        self.assertEqual(driver.state[12], (0, 51, 0))
+        bridge.set_brightness(1)
+        driver.show(bridge.lights(), force=True)
+        self.assertEqual(sent[-1].data[6], 0x71)
+
     def test_long_trail_is_dim_on_release_and_visibly_fades_immediately(self):
         now = [0.]
         bridge = Bridge(left=(255, 0, 0), now=lambda: now[0])
@@ -200,6 +258,10 @@ class TrailAndColorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "config.json"
             for section, key, value in (("practice", "note_colors", {"128": "FF0000"}),
+                                        ("lighting", "bridge_brightness", -0.1),
+                                        ("lighting", "bridge_brightness", 1.1),
+                                        ("lighting", "bridge_brightness", float("nan")),
+                                        ("lighting", "bridge_enabled", "yes"),
                                         ("practice", "note_colors", {"60": "wrong"}),
                                         ("trail", "duration_seconds", 0),
                                         ("trail", "duration_seconds", float("nan")),
