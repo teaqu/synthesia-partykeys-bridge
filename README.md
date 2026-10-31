@@ -133,6 +133,10 @@ Extract the ZIP before running it, then open **PartyKeys Lights.app** on Mac or 
 
 The Mac app bundles the GUI and its runtime together, avoiding the separate GUI shell launcher and executable. These builds still have no Apple Developer ID signature or notarization, so macOS can still require **System Settings → Privacy & Security → Open Anyway** and authentication. The app format does not guarantee that these checks disappear. The Windows executable is also unsigned.
 
+Windows builds from the current source use folder-based apps instead of self-extracting executables. Keep **PartyKeys Lights.exe**, **partykeys.exe**, **_internal**, **_console**, **native-midi-helper**, and **config.json** together after extracting. A local folder-based build passed Microsoft Defender's scan after the v0.1.8 single-file GUI was detected as `Trojan:Win32/Cloxer`. This does not establish that the original detection was a false positive or guarantee future antivirus results. The existing v0.1.8 release assets still use the older packaging.
+
+If Defender blocks a download, check **Windows Security → Virus & threat protection → Protection history** for the detected file and threat name. Report a suspected false positive through [Microsoft's file submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission/?persona=SoftwareDeveloper), including the release URL and SHA-256. Do not disable protection or add an exclusion to install it.
+
 The Mac app saves settings in `~/Library/Application Support/PartyKeys Lights/config.json`, outside the app, so replacing the app preserves them. On first launch it imports a valid `config.json` beside the app if one is available; otherwise it uses the defaults. To migrate older settings when the app has already been moved or macOS isolates it during first launch, quit it and copy your old config to that Application Support location before reopening. The console executable and Windows GUI continue to use `config.json` beside their executable.
 
 ## Set up Synthesia on macOS
@@ -215,12 +219,14 @@ The [Executables workflow](https://github.com/teaqu/synthesia-partykeys-bridge/a
 
 ```sh
 python -m unittest discover -s tests -v
-python scripts/smoke_gui.py dist/partykeys  # Use dist/partykeys.exe on Windows
+python scripts/smoke_gui.py dist/partykeys  # Windows GUI: "dist/PartyKeys Lights/PartyKeys Lights.exe"
 partykeys test --dry-run --note 60 --seconds 0.1
 partykeys preview "YOUR SONG.mid" --dry-run --lookahead 0.2 --speed 2
 ```
 
 `--dry-run` sends no hardware LED output. Preview/test dry runs require no MIDI hardware; bridge dry runs still read a cue input and create the temporary destination when `--virtual-input` is used.
+
+Windows CI builds both apps with `--onedir --noupx`, packages their separate runtime folders beside the executables, and runs the CLI and GUI checks again from a fresh extraction of the final ZIP. Before publishing a Windows release, scan the entire extracted package with current Defender definitions and record the scan result and ZIP checksum. A successful build or scan does not resolve a detection on an older release; submit the exact detected file to Microsoft for review.
 
 Optional macOS integration check:
 

@@ -1,6 +1,7 @@
 @echo off
 setlocal
 if not exist "%~dp0partykeys.exe" goto extract_first
+if not exist "%~dp0_console\python312.dll" goto extract_first
 if not exist "%~dp0native-midi-helper\PartyKeys.Midi.exe" goto extract_first
 if not exist "%~dp0config.json" goto extract_first
 cd /d "%~dp0"
@@ -18,7 +19,7 @@ echo.
 echo ERROR: Extract the ZIP first.
 echo Right-click the downloaded ZIP and choose Extract All.
 echo Then open Start Synthesia bridge.cmd from the extracted folder.
-echo Keep partykeys.exe, config.json and the native-midi-helper folder together.
+echo Keep partykeys.exe, config.json, _console and native-midi-helper together.
 echo.
 pause
 exit /b 1

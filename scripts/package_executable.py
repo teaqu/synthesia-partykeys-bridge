@@ -9,26 +9,37 @@ import subprocess
 import sys
 import zipfile
 
+root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("platform", choices=("windows-x64", "macos-arm64", "macos-x64"))
+parser.add_argument("--dist-dir", type=Path, default=root / "dist")
 args = parser.parse_args()
-root = Path(__file__).resolve().parents[1]
+dist_dir = args.dist_dir.resolve()
 project = (root / "pyproject.toml").read_text(encoding="utf-8").split("[project]", 1)[1].split("\n[", 1)[0]
 version = re.search(r'^version\s*=\s*"([^"]+)"', project, re.MULTILINE).group(1)
 if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.+-]*", version):
     raise SystemExit("Project version cannot be used in an archive filename")
 name = f"partykeys-lights-v{version}-{args.platform}"
-bundle = root / "dist" / name
+bundle = dist_dir / name
+if bundle.is_symlink() or bundle.resolve().parent != dist_dir:
+    raise SystemExit("Package staging folder must stay inside the distribution directory")
 if bundle.exists():
     shutil.rmtree(bundle)  # This generated staging folder must not retain old launchers.
 bundle.mkdir(parents=True, exist_ok=True)
 windows = args.platform.startswith("windows-")
 exe = "partykeys.exe" if windows else "partykeys"
 launcher = "Start Synthesia bridge.cmd" if windows else "Start Synthesia bridge.command"
-for source in (root / "dist" / exe, root / "packaging" / launcher,
+for source in (root / "packaging" / launcher,
                root / "README.md", root / "LICENSE"):
     shutil.copy2(source, bundle / source.name)
 if windows:
+    # Both launchers stay beside config.json and the native MIDI helper. Their
+    # separate runtime directories avoid merging two PyInstaller collections.
+    for folder, runtime in (("partykeys", "_console"), ("PartyKeys Lights", "_internal")):
+        source = dist_dir / folder
+        if not (source / runtime / "python312.dll").is_file():
+            raise SystemExit(f"Build the Windows folder package first: {source}")
+        shutil.copytree(source, bundle, dirs_exist_ok=True)
     helper = root / "native-midi-helper"
     if not (helper / "PartyKeys.Midi.exe").is_file():
         raise SystemExit("Build native/windows-midi-helper before packaging Windows")
@@ -36,17 +47,16 @@ if windows:
                     ignore=shutil.ignore_patterns("*.pdb"))
     shutil.copy2(root / "native" / "windows-midi-helper" / "PREVIEW.txt", bundle / "WINDOWS-MIDI-PREVIEW.txt")
 shutil.copy2(root / "config.json", bundle / "config.json")
-if windows:
-    shutil.copy2(root / "dist" / "PartyKeys Lights.exe", bundle / "PartyKeys Lights.exe")
-else:
-    shutil.copytree(root / "dist" / "PartyKeys Lights.app", bundle / "PartyKeys Lights.app", symlinks=True)
+if not windows:
+    shutil.copy2(dist_dir / exe, bundle / exe)
+    shutil.copytree(dist_dir / "PartyKeys Lights.app", bundle / "PartyKeys Lights.app", symlinks=True)
 if not windows:
     (bundle / exe).chmod(0o755)
     (bundle / launcher).chmod(0o755)
 shutil.copytree(root / "docs" / "images", bundle / "docs" / "images", dirs_exist_ok=True)
 subprocess.run([sys.executable, str(root / "scripts" / "bundle_notices.py"),
                 str(bundle)], check=True)
-archive = root / "dist" / (name + ".zip")
+archive = dist_dir / (name + ".zip")
 if windows:
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for source in sorted(bundle.rglob("*")):
