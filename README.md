@@ -2,7 +2,9 @@
 
 ![Synthesia driving blue and green hand cues on connected PartyKeys keyboards](docs/images/synthesia-partykeys-demo.webp)
 
-Light your PartyKeys keyboard from Synthesia, choose practice colours for individual keys, and add fading trails. Open the desktop app on Windows or macOS to control the lights. Practice colours work on their own, and Synthesia cues take priority during a song. Joined PartyKeys boards are supported.
+Light your PartyKeys keyboard from Synthesia or PianoGlow, choose practice colours for individual keys, and add fading trails. Open the desktop app on Windows or macOS to control the lights. Song cues take priority over painted practice colours. Joined PartyKeys boards are supported. Synthesia provides separate hand cues; PianoGlow practice hints use one chosen colour.
+
+> **Release availability:** the download links below still point to v0.1.8. PianoGlow practice support and the new Windows folder packaging are in the current source and [GitHub Actions builds](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml), and require a newer release to appear in the public downloads. Defender detected the v0.1.8 Windows GUI as `Trojan:Win32/Cloxer`; see [Opening your download](#opening-your-download) for details and the review process.
 
 ## Get started
 
@@ -17,7 +19,7 @@ Light your PartyKeys keyboard from Synthesia, choose practice colours for indivi
 
    Older downloads, including v0.1.7, use **Practice lights.cmd** on Windows or **Practice lights.command** on Mac instead.
 
-4. Keep the window open. For practice lights, choose a colour and **Paint** or **Erase**, then click keys. Right-click temporarily does the opposite. To edit by playing your physical keyboard, enable **Use physical keyboard to paint / erase**. For Synthesia, follow the [Mac setup](#set-up-synthesia-on-macos) or [Windows setup](#set-up-on-windows) once, then start a song.
+4. Keep the window open. For painted practice lights, choose a colour and **Paint** or **Erase**, then click keys. Right-click temporarily does the opposite. To edit by playing your physical keyboard, enable **Use physical keyboard to paint / erase**. For song cues, follow the Synthesia [Mac setup](#set-up-synthesia-on-macos), [Windows setup](#set-up-on-windows), or [PianoGlow setup](#set-up-pianoglow-current-source-builds).
 
 **No Python installation is needed for packaged downloads.** The GUI starts the bridge itself; you do not need to run the console launcher alongside it. Close the window to stop its bridge and clear the lights.
 
@@ -26,6 +28,7 @@ The GUI gives you:
 - Independent colours for each practice key, with eight presets and a custom colour picker.
 - Physical keyboard painting and erasing, plus saved practice selections and brightness.
 - Synthesia left- and right-hand colour controls.
+- PianoGlow's upcoming practice keys in the right-hand colour (current source builds).
 - Trail mode with immediate fading, adjustable duration and a separate maximum brightness.
 - Start/stop controls and live settings changes, with 1 ms LED pacing by default.
 
@@ -61,13 +64,14 @@ right-click temporarily does the opposite (Control-click works too on macOS).
 The selected mode stays unchanged after right-clicking. Each key keeps its own
 colour when you change the brush. **Practice brightness** applies to all practice keys.
 
-**Bridge brightness** controls Synthesia's active key lights from 0–100% (100%
+**Bridge brightness** controls active song key lights from 0–100% (100%
 by default). Changes apply live, including to keys already lit, and are saved
 for the next launch. Practice brightness and trail maximum brightness remain
 independent. Below 100%, the bridge uses per-key RGB to dim the hardware's
 otherwise fixed-brightness palette colours.
 Turn off **Enable Synthesia lights** to hide Synthesia cues and their trails on the
 physical keyboard. Practice lights and GUI pressed-key feedback keep working.
+Despite its label, this toggle also controls PianoGlow cues in current source builds.
 Re-enable it to restore the current cues. This setting is also saved.
 **Disconnect keyboard** stops all lighting and physical-key input; it is for
 closing the connection, rather than pausing Synthesia cues. Use **Enable Synthesia
@@ -166,12 +170,6 @@ Close the app window when you finish to clear the lights and stop the bridge.
 
 ## Set up on Windows
 
-### PianoGlow practice (current source builds)
-
-Start PartyKeys Lights, then in PianoGlow **Settings → MIDI** enable **Light Up** on the **Synthesia Lights** output. Disable that port under MIDI Input; keep PartyKeys enabled as input. The ordinary output **Enabled** button is optional for playback/played-note lighting; practice hints use the separate **Light Up** button. Leave **Enable Synthesia lights** on in the bridge, as it controls both apps' cues.
-
-PianoGlow's practice hints use channel 16 Note On with velocity zero for light-on and explicit Note Off for light-off. Current source builds decode these automatically using the bridge's right-hand colour. Ordinary note releases do not cancel a pending practice hint. PianoGlow does not send hand labels or RGB colours in this stream. Explicit custom mappings of channel 16 retain standard MIDI semantics instead. The existing v0.1.8 downloads do not support these practice messages.
-
 On **Windows 11 25H2 or newer**, the app creates the Synthesia connection automatically. For older Windows versions, use the [loopMIDI setup below](#using-loopmidi-instead).
 
 1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside **PartyKeys Lights.exe**. Double-click **PartyKeys Lights.exe** and keep the window open. Older downloads such as v0.1.7 use **Practice lights.cmd**. **Start Synthesia bridge.cmd** remains the console-only alternative.
@@ -207,11 +205,28 @@ For older Windows versions, or when using loopMIDI instead of the native MIDI AP
 
 The screenshot shows the port after clicking **+**, with MIDI traffic passing through it. **Total data** increases as messages arrive; **Throughput / sec.** can return to `0 Byte` between messages. Open loopMIDI before the bridge and Synthesia on later runs too. Use either loopMIDI or the native bridge for this name; stop the native bridge before creating the loopMIDI port to avoid duplicate names.
 
+## Set up PianoGlow (current source builds)
+
+The existing v0.1.8 downloads do not support PianoGlow practice hints. Use a build from the current source or GitHub Actions. Practice hints are the upcoming keys PianoGlow asks you to play, including while the song waits for your input; they are separate from notes already being played.
+
+1. Start PartyKeys Lights before PianoGlow. Keep **Enable Synthesia lights** on in the bridge; the toggle controls both apps' song cues. The MIDI port keeps the name **Synthesia Lights** when used with PianoGlow.
+2. In PianoGlow **Settings → MIDI → MIDI Input**, enable **PartyKeys** and disable **Synthesia Lights** to avoid feeding output back into the app.
+3. Under **MIDI Output**, turn on **Light Up** for **Synthesia Lights**. This sends practice hints. The separate **Enabled** button sends ordinary playback/played notes; enable it too if you want those lit. Keep direct PartyKeys output off while the bridge controls its LEDs.
+4. Open a song in **Practice / Falling Notes**. If an already-waiting hint does not appear after restarting the bridge, turn **Light Up** off and on to resend it, or advance to the next notes.
+
+Both hands' hints use the bridge's **Right hand…** colour. PianoGlow's on-screen hand colours are not included in its current MIDI guide stream, so they cannot be matched automatically through that output. This differs from Synthesia's finger-based channel mode, which identifies hands. Painted practice colours and **Practice brightness** are independent background lights, not PianoGlow hints.
+
+Verified on Windows with PianoGlow v0.70.0: a 90-second capture through the bridge received 416 PianoGlow messages—251 ordinary note messages on channel 1 and 165 guide messages on channel 16. Every guide message used velocity zero; no controller, program-change, SysEx or other message carrying hand/colour data arrived during that capture. macOS builds include the decoder, but PianoGlow hardware behaviour was checked on Windows only.
+
+The decoder treats channel-16 Note On with velocity zero as light-on and explicit Note Off as light-off. Repeated hint synchronization is idempotent, and ordinary played-note releases do not cancel pending hints. Explicit custom mappings of channel 16 retain standard MIDI semantics instead.
+
 ## Troubleshooting
 
 - **Shifted lights, missing low notes, or playing the right keyboard paints the left:** the app may have started after the keyboard was already octave-shifted. Keep the bridge running and use the physical octave buttons to select the desired octave; each press reports the resulting octave and resyncs both Synthesia and practice-light routing. To return to the same octave, move one step away from the current setting and back (choose a direction that is not already at its limit). Starting the bridge assumes octave zero until it receives an octave report.
 - **A joined keyboard is still missing after octave resync:** stop the app and unplug the MIDI/USB cable. Detach and reattach the joined keyboard, reconnect USB, then restart the app. If the octave is already shifted, resync it using the octave buttons while the bridge runs.
-- **No practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Practice brightness**. Choose pitches available on your connected keyboard.
+- **No painted practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Practice brightness**. Choose pitches available on your connected keyboard.
+- **No PianoGlow practice hints:** use a current build, enable **Light Up** on the **Synthesia Lights** output in PianoGlow, and leave **Enable Synthesia lights** on in the bridge. Toggle **Light Up** off/on after restarting the bridge to resend waiting hints. Enabling ordinary output alone only supplies playback/played-note lighting.
+- **Both PianoGlow hands have one colour:** this is expected for its current guide stream. Use **Right hand…** in the bridge to choose that colour; PianoGlow's screen hand colours are not transmitted.
 - **Playing keys does not assign colours:** enable **Use physical keyboard to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
 - **Missing lights on joined boards:** check the connections and octave settings, then reconnect the keyboard. Notes outside the connected boards' range cannot light up.
