@@ -1,4 +1,4 @@
-"""Synthesia finger-based key-light messages, not ordinary performance MIDI."""
+"""Synthesia finger cues and PianoGlow channel-16 practice guide lights."""
 from .practice import practice_lights
 from .practice import ExactRGB
 import math
@@ -71,12 +71,25 @@ class Bridge:
                 self.active = {k: v for k, v in self.active.items() if k[0] != message.channel}
                 self.counts = {k: v for k, v in self.counts.items() if k[0] != message.channel}
         elif message.type in ("note_on", "note_off"):
+            # PianoGlow uses 9F <pitch> 00 for guide ON and 8F <pitch> 00
+            # for OFF. Zero velocity is deliberately an onset in this protocol.
+            # Keep explicit user channel mappings on their existing semantics.
+            if message.channel == 15 and 15 not in self.left_channels | self.right_channels:
+                key = (15, message.note)
+                if message.type == "note_on" and message.velocity == 0:
+                    self.active[key] = self.right
+                    self.counts[key] = 1  # Re-synchronizing a guide is idempotent.
+                elif message.type == "note_off":
+                    self.active.pop(key, None)
+                    self.counts.pop(key, None)
+                return
             if message.channel == 0 and (message.type == "note_off" or message.velocity == 0):
                 # Observed Synthesia finger-light stream: onset on the finger
                 # channel, release on channel 1 (Mido 0), for that pitch across
                 # all finger channels. A missed/unused cue must still go dark.
-                self.active = {k: v for k, v in self.active.items() if k[1] != message.note}
-                self.counts = {k: v for k, v in self.counts.items() if k[1] != message.note}
+                guide_channel = 15 if 15 not in self.left_channels | self.right_channels else None
+                self.active = {k: v for k, v in self.active.items() if k[1] != message.note or k[0] == guide_channel}
+                self.counts = {k: v for k, v in self.counts.items() if k[1] != message.note or k[0] == guide_channel}
                 return
             if message.channel not in self.left_channels | self.right_channels:
                 return

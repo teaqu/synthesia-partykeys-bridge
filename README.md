@@ -166,6 +166,12 @@ Close the app window when you finish to clear the lights and stop the bridge.
 
 ## Set up on Windows
 
+### PianoGlow practice (current source builds)
+
+Start PartyKeys Lights, then in PianoGlow **Settings → MIDI** enable **Light Up** on the **Synthesia Lights** output. Disable that port under MIDI Input; keep PartyKeys enabled as input. The ordinary output **Enabled** button is optional for playback/played-note lighting; practice hints use the separate **Light Up** button. Leave **Enable Synthesia lights** on in the bridge, as it controls both apps' cues.
+
+PianoGlow's practice hints use channel 16 Note On with velocity zero for light-on and explicit Note Off for light-off. Current source builds decode these automatically using the bridge's right-hand colour. Ordinary note releases do not cancel a pending practice hint. PianoGlow does not send hand labels or RGB colours in this stream. Explicit custom mappings of channel 16 retain standard MIDI semantics instead. The existing v0.1.8 downloads do not support these practice messages.
+
 On **Windows 11 25H2 or newer**, the app creates the Synthesia connection automatically. For older Windows versions, use the [loopMIDI setup below](#using-loopmidi-instead).
 
 1. Extract the **entire app ZIP**, keeping `native-midi-helper` beside **PartyKeys Lights.exe**. Double-click **PartyKeys Lights.exe** and keep the window open. Older downloads such as v0.1.7 use **Practice lights.cmd**. **Start Synthesia bridge.cmd** remains the console-only alternative.
