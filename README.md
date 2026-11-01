@@ -4,8 +4,6 @@
 
 Light your PartyKeys keyboard from Synthesia or PianoGlow, choose practice colours for individual keys, and add fading trails. Open the desktop app on Windows or macOS to control the lights. Song cues take priority over painted practice colours. Joined PartyKeys boards are supported. Synthesia provides separate hand cues; PianoGlow practice hints use one chosen colour.
 
-> **v0.1.9:** adds PianoGlow practice hints and folder-based Windows apps. Extract the entire Windows ZIP and keep its runtime folders beside the executables. Both PianoGlow hands use the bridge’s right-hand colour; PianoGlow does not transmit hand colours in its current MIDI output.
-
 ## Get started
 
 1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-x64.zip).
