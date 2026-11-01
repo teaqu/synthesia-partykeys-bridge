@@ -22,9 +22,9 @@ jobs:
           - name: windows-x64
             runner: windows-2022
             architecture: x64
-            executable: partykeys.exe
+            executable: partykeys/partykeys.exe
           - name: macos-arm64
-            runner: macos-14
+            runner: macos-15
             architecture: arm64
             executable: partykeys
           - name: macos-x64
@@ -50,7 +50,8 @@ jobs:
         run: python scripts/build_windows_helper.py
       - name: Build executable
         run: >-
-          python -m PyInstaller --noconfirm --clean --onefile --console
+          python -m PyInstaller --noconfirm --clean
+          ${{ runner.os == 'Windows' && '--onedir --noupx --contents-directory _console' || '--onefile' }} --console
           --name partykeys --hidden-import mido.backends.rtmidi
           --collect-all rtmidi packaging/entry.py
       - name: Test executable without MIDI hardware
@@ -58,11 +59,11 @@ jobs:
       - name: Build Windows GUI executable
         if: runner.os == 'Windows'
         run: >-
-          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          python -m PyInstaller --noconfirm --clean --onedir --noupx --windowed
           --name "PartyKeys Lights" --hidden-import mido.backends.rtmidi
           --collect-all rtmidi packaging/gui_entry.py
       - name: Launch and test packaged GUI without MIDI hardware
-        run: python scripts/smoke_gui.py "dist/${{ runner.os == 'Windows' && 'PartyKeys Lights.exe' || matrix.executable }}"
+        run: python scripts/smoke_gui.py "dist/${{ runner.os == 'Windows' && 'PartyKeys Lights/PartyKeys Lights.exe' || matrix.executable }}"
       - name: Test automatic macOS MIDI destination
         if: runner.os == 'macOS'
         run: python tests/mac_virtual_input_smoke.py dist/${{ matrix.executable }}
@@ -78,6 +79,9 @@ jobs:
       - name: Verify extracted Mac app archive
         if: runner.os == 'macOS'
         run: python scripts/smoke_mac_app.py "${{ steps.package.outputs.archive }}"
+      - name: Verify extracted Windows app archive
+        if: runner.os == 'Windows'
+        run: python scripts/smoke_windows_archive.py "${{ steps.package.outputs.archive }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.package.outputs.name }}
