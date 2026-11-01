@@ -4,11 +4,11 @@
 
 Light your PartyKeys keyboard from Synthesia or PianoGlow, choose practice colours for individual keys, and add fading trails. Open the desktop app on Windows or macOS to control the lights. Song cues take priority over painted practice colours. Joined PartyKeys boards are supported. Synthesia provides separate hand cues; PianoGlow practice hints use one chosen colour.
 
-> **Release availability:** the download links below still point to v0.1.8. PianoGlow practice support and the new Windows folder packaging are in the current source and [GitHub Actions builds](https://github.com/teaqu/synthesia-partykeys-bridge/actions/workflows/executables.yml), and require a newer release to appear in the public downloads. Defender detected the v0.1.8 Windows GUI as `Trojan:Win32/Cloxer`; see [Opening your download](#opening-your-download) for details and the review process.
+> **v0.1.9:** adds PianoGlow practice hints and folder-based Windows apps. Extract the entire Windows ZIP and keep its runtime folders beside the executables. Both PianoGlow hands use the bridge’s right-hand colour; PianoGlow does not transmit hand colours in its current MIDI output.
 
 ## Get started
 
-1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-x64.zip).
+1. **Download and extract the ZIP for your computer:** [Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-windows-x64.zip), [Mac with Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-arm64.zip), or [Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-x64.zip).
 2. Connect your PartyKeys keyboard by USB. Stop any older bridge instance before opening the GUI.
 3. Open the GUI for your platform:
 
@@ -19,7 +19,7 @@ Light your PartyKeys keyboard from Synthesia or PianoGlow, choose practice colou
 
    Older downloads, including v0.1.7, use **Practice lights.cmd** on Windows or **Practice lights.command** on Mac instead.
 
-4. Keep the window open. For painted practice lights, choose a colour and **Paint** or **Erase**, then click keys. Right-click temporarily does the opposite. To edit by playing your physical keyboard, enable **Use physical keyboard to paint / erase**. For song cues, follow the Synthesia [Mac setup](#set-up-synthesia-on-macos), [Windows setup](#set-up-on-windows), or [PianoGlow setup](#set-up-pianoglow-current-source-builds).
+4. Keep the window open. For painted practice lights, choose a colour and **Paint** or **Erase**, then click keys. Right-click temporarily does the opposite. To edit by playing your physical keyboard, enable **Use physical keyboard to paint / erase**. For song cues, follow the Synthesia [Mac setup](#set-up-synthesia-on-macos), [Windows setup](#set-up-on-windows), or [PianoGlow setup](#set-up-pianoglow-v019).
 
 **No Python installation is needed for packaged downloads.** The GUI starts the bridge itself; you do not need to run the console launcher alongside it. Close the window to stop its bridge and clear the lights.
 
@@ -28,7 +28,7 @@ The GUI gives you:
 - Independent colours for each practice key, with eight presets and a custom colour picker.
 - Physical keyboard painting and erasing, plus saved practice selections and brightness.
 - Synthesia left- and right-hand colour controls.
-- PianoGlow's upcoming practice keys in the right-hand colour (current source builds).
+- PianoGlow's upcoming practice keys in the right-hand colour (v0.1.9+).
 - Trail mode with immediate fading, adjustable duration and a separate maximum brightness.
 - Start/stop controls and live settings changes, with 1 ms LED pacing by default.
 
@@ -36,21 +36,21 @@ The console launcher remains available for terminal use.
 
 ## Downloads
 
-[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-arm64.zip)
-[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-x64.zip)
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-windows-x64.zip)
+[![Download for Mac — Apple Silicon](https://img.shields.io/badge/Download-Mac_Apple_Silicon-007AFF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-arm64.zip)
+[![Download for Mac — Intel](https://img.shields.io/badge/Download-Mac_Intel-555555?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-x64.zip)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge)](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-windows-x64.zip)
 
 Each download includes the desktop app, an optional console launcher, setup guide and license notices. No GitHub sign-in is needed.
 
 | Your computer | Direct download | Setup guide |
 | --- | --- | --- |
-| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
-| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/partykeys-lights-v0.1.8-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
+| Mac with Apple Silicon (M1 or newer), macOS 14+ | [Download for Apple Silicon](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-arm64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| Mac with an Intel processor, macOS 15+ | [Download for Intel Mac](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-macos-x64.zip) | [Mac setup](#set-up-synthesia-on-macos) |
+| 64-bit Windows PC | [Download for Windows](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/partykeys-lights-v0.1.9-windows-x64.zip) | [Windows setup](#set-up-on-windows) |
 
 Not sure which Mac download to choose? Open **Apple menu → About This Mac**: “Chip: Apple M…” means Apple Silicon; “Processor: Intel…” means Intel.
 
-[Release notes and all downloads](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.8/SHA256SUMS-v0.1.8.txt)
+[Release notes and all downloads](https://github.com/teaqu/synthesia-partykeys-bridge/releases/latest) · [SHA-256 checksums](https://github.com/teaqu/synthesia-partykeys-bridge/releases/download/v0.1.9/SHA256SUMS-v0.1.9.txt)
 
 > **Requires PartyKeys keyboard firmware v9. Update your keyboard with PartyKeys Hub before using the bridge.**
 
@@ -71,7 +71,7 @@ independent. Below 100%, the bridge uses per-key RGB to dim the hardware's
 otherwise fixed-brightness palette colours.
 Turn off **Enable Synthesia lights** to hide Synthesia cues and their trails on the
 physical keyboard. Practice lights and GUI pressed-key feedback keep working.
-Despite its label, this toggle also controls PianoGlow cues in current source builds.
+Despite its label, this toggle also controls PianoGlow cues in v0.1.9 and newer.
 Re-enable it to restore the current cues. This setting is also saved.
 **Disconnect keyboard** stops all lighting and physical-key input; it is for
 closing the connection, rather than pausing Synthesia cues. Use **Enable Synthesia
@@ -137,7 +137,7 @@ Extract the ZIP before running it, then open **PartyKeys Lights.app** on Mac or 
 
 The Mac app bundles the GUI and its runtime together, avoiding the separate GUI shell launcher and executable. These builds still have no Apple Developer ID signature or notarization, so macOS can still require **System Settings → Privacy & Security → Open Anyway** and authentication. The app format does not guarantee that these checks disappear. The Windows executable is also unsigned.
 
-Windows builds from the current source use folder-based apps instead of self-extracting executables. Keep **PartyKeys Lights.exe**, **partykeys.exe**, **_internal**, **_console**, **native-midi-helper**, and **config.json** together after extracting. A local folder-based build passed Microsoft Defender's scan after the v0.1.8 single-file GUI was detected as `Trojan:Win32/Cloxer`. This does not establish that the original detection was a false positive or guarantee future antivirus results. The existing v0.1.8 release assets still use the older packaging.
+Windows v0.1.9 and newer use folder-based apps instead of self-extracting executables. Keep **PartyKeys Lights.exe**, **partykeys.exe**, **_internal**, **_console**, **native-midi-helper**, and **config.json** together after extracting. The folder-based Windows build passed Microsoft Defender's scan during validation after the v0.1.8 single-file GUI was detected as `Trojan:Win32/Cloxer`. This does not establish that the original detection was a false positive or guarantee future antivirus results. Older v0.1.8 release assets still use the single-file packaging.
 
 If Defender blocks a download, check **Windows Security → Virus & threat protection → Protection history** for the detected file and threat name. Report a suspected false positive through [Microsoft's file submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission/?persona=SoftwareDeveloper), including the release URL and SHA-256. Do not disable protection or add an exclusion to install it.
 
@@ -205,9 +205,9 @@ For older Windows versions, or when using loopMIDI instead of the native MIDI AP
 
 The screenshot shows the port after clicking **+**, with MIDI traffic passing through it. **Total data** increases as messages arrive; **Throughput / sec.** can return to `0 Byte` between messages. Open loopMIDI before the bridge and Synthesia on later runs too. Use either loopMIDI or the native bridge for this name; stop the native bridge before creating the loopMIDI port to avoid duplicate names.
 
-## Set up PianoGlow (current source builds)
+## Set up PianoGlow (v0.1.9+)
 
-The existing v0.1.8 downloads do not support PianoGlow practice hints. Use a build from the current source or GitHub Actions. Practice hints are the upcoming keys PianoGlow asks you to play, including while the song waits for your input; they are separate from notes already being played.
+Use v0.1.9 or newer for PianoGlow practice hints; v0.1.8 does not decode them. Practice hints are the upcoming keys PianoGlow asks you to play, including while the song waits for your input; they are separate from notes already being played.
 
 1. Start PartyKeys Lights before PianoGlow. Keep **Enable Synthesia lights** on in the bridge; the toggle controls both apps' song cues. The MIDI port keeps the name **Synthesia Lights** when used with PianoGlow.
 2. In PianoGlow **Settings → MIDI → MIDI Input**, enable **PartyKeys** and disable **Synthesia Lights** to avoid feeding output back into the app.
@@ -225,7 +225,7 @@ The decoder treats channel-16 Note On with velocity zero as light-on and explici
 - **Shifted lights, missing low notes, or playing the right keyboard paints the left:** the app may have started after the keyboard was already octave-shifted. Keep the bridge running and use the physical octave buttons to select the desired octave; each press reports the resulting octave and resyncs both Synthesia and practice-light routing. To return to the same octave, move one step away from the current setting and back (choose a direction that is not already at its limit). Starting the bridge assumes octave zero until it receives an octave report.
 - **A joined keyboard is still missing after octave resync:** stop the app and unplug the MIDI/USB cable. Detach and reattach the joined keyboard, reconnect USB, then restart the app. If the octave is already shifted, resync it using the octave buttons while the bridge runs.
 - **No painted practice lights:** turn on **Enable practice lights**, paint some keys, and raise **Practice brightness**. Choose pitches available on your connected keyboard.
-- **No PianoGlow practice hints:** use a current build, enable **Light Up** on the **Synthesia Lights** output in PianoGlow, and leave **Enable Synthesia lights** on in the bridge. Toggle **Light Up** off/on after restarting the bridge to resend waiting hints. Enabling ordinary output alone only supplies playback/played-note lighting.
+- **No PianoGlow practice hints:** use v0.1.9 or newer, enable **Light Up** on the **Synthesia Lights** output in PianoGlow, and leave **Enable Synthesia lights** on in the bridge. Toggle **Light Up** off/on after restarting the bridge to resend waiting hints. Enabling ordinary output alone only supplies playback/played-note lighting.
 - **Both PianoGlow hands have one colour:** this is expected for its current guide stream. Use **Right hand…** in the bridge to choose that colour; PianoGlow's screen hand colours are not transmitted.
 - **Playing keys does not assign colours:** enable **Use physical keyboard to paint / erase** and choose **Paint**. Turn it off again for normal practice.
 - **No Synthesia cues:** keep the app running, enable **Synthesia Lights** in Synthesia's Music Output, and select **Key Lights → Finger-based channel**. Restart Synthesia if the output disappeared while restarting the app.
