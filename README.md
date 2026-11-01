@@ -216,10 +216,6 @@ Use v0.1.9 or newer for PianoGlow practice hints; v0.1.8 does not decode them. P
 
 Both hands' hints use the bridge's **Right hand…** colour. PianoGlow's on-screen hand colours are not included in its current MIDI guide stream, so they cannot be matched automatically through that output. This differs from Synthesia's finger-based channel mode, which identifies hands. Painted practice colours and **Practice brightness** are independent background lights, not PianoGlow hints.
 
-Verified on Windows with PianoGlow v0.70.0: a 90-second capture through the bridge received 416 PianoGlow messages—251 ordinary note messages on channel 1 and 165 guide messages on channel 16. Every guide message used velocity zero; no controller, program-change, SysEx or other message carrying hand/colour data arrived during that capture. macOS builds include the decoder, but PianoGlow hardware behaviour was checked on Windows only.
-
-The decoder treats channel-16 Note On with velocity zero as light-on and explicit Note Off as light-off. Repeated hint synchronization is idempotent, and ordinary played-note releases do not cancel pending hints. Explicit custom mappings of channel 16 retain standard MIDI semantics instead.
-
 ## Troubleshooting
 
 - **Shifted lights, missing low notes, or playing the right keyboard paints the left:** the app may have started after the keyboard was already octave-shifted. Keep the bridge running and use the physical octave buttons to select the desired octave; each press reports the resulting octave and resyncs both Synthesia and practice-light routing. To return to the same octave, move one step away from the current setting and back (choose a direction that is not already at its limit). Starting the bridge assumes octave zero until it receives an octave report.
